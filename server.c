@@ -51,6 +51,20 @@ int getUsernameLength(int sock)
 	return i;
 }
 
+bool isUniqueUsername(struct username * users, int size, char* newUser)
+{
+	int i;
+	for (i = 0; i < size; i++) 
+	{
+		fprintf(stderr, "for loop iter: %d\n", i);
+		fprintf(stderr, "comparing: %s and %s \n", users[i].name, newUser);
+		if (strcmp(users[i].name, newUser) == 0) // two names match so invalid username since not unqiue
+			return false;
+	}
+
+	return true;
+}
+
 int main()
 {
 	struct username user; // used to get size
@@ -103,14 +117,22 @@ int main()
 		username[usernameLen] = '\0';
 		fprintf(stderr, "Client username: %s\n",username);
 
-		numberOfUsers = numberOfUsers + 1;
-		users = realloc(users, numberOfUsers * sizeof(user));
-		addUserName(users, numberOfUsers, username, usernameLen);
+		if(isUniqueUsername(users, numberOfUsers, username))
+		{
+			numberOfUsers = numberOfUsers + 1;
+			users = realloc(users, numberOfUsers * sizeof(user));
+			addUserName(users, numberOfUsers, username, usernameLen);
 
-		// users = realloc(users, numberOfUsers * sizeof(*users));
-		// users[numberOfUsers - 1] = username;
-		fprintf(stderr, "Added user, &users = %p\n", (void*)&users);
-		printUsers(users, numberOfUsers);
+			// users = realloc(users, numberOfUsers * sizeof(*users));
+			// users[numberOfUsers - 1] = username;
+			fprintf(stderr, "Added user, &users = %p\n", (void*)&users);
+			printUsers(users, numberOfUsers);
+		}
+		else
+		{
+			fprintf(stderr, "close connection\n");
+			close(snew);
+		}
 
 		// int keepAliveTime = 3000;
 		// clock_t before = clock()*1000/CLOCKS_PER_SEC;
@@ -142,4 +164,3 @@ int main()
 			fprintf(stderr, "\n");
 	}
 }
-

@@ -9,6 +9,10 @@
 
 #define	MY_PORT	2222
 
+typedef int bool;
+#define true 1
+#define false 0
+
 struct username
 {
 	int length;
@@ -22,3 +26,4 @@ void sendInitialHandshake(int sock);
 void sendNumberOfUsers(int sock, int numUsers);
 
 int getUsernameLength(int sock);
+bool isUniqueUsername(struct username * users, int size, char* newUser);
