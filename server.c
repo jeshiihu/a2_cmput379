@@ -24,29 +24,29 @@ void addUserName(struct username * users, int size, char* name, int nameLen)
 	strcpy(users[size - 1].name, name);
 }
 
-void sendInitialHandshake(int sock)
+void sendInitialHandshake(int listener)
 {
 	fprintf(stderr, "sending handshake...\n" );
 
 	int outnum = htonl(0xCF);
-	send (sock, &outnum, sizeof (outnum), 0);
+	send (listener, &outnum, sizeof (outnum), 0);
 	
 	outnum = htonl (0xA7);
-	send (sock, &outnum, sizeof (outnum), 0);
+	send (listener, &outnum, sizeof (outnum), 0);
 }
 
-void sendNumberOfUsers(int sock, int numUsers)
+void sendNumberOfUsers(int listener, int numUsers)
 {
 	fprintf(stderr, "sending number of users...\n" );
 
 	int num = htons(numUsers);
-	send (sock, &num, sizeof(num), 0);
+	send (listener, &num, sizeof(num), 0);
 }
 
-int getUsernameLength(int sock)
+int getUsernameLength(int listener)
 {
 	int i;
-	recv(sock, &i, sizeof(i), 0);
+	recv(listener, &i, sizeof(i), 0);
 
 	return i;
 }
@@ -56,7 +56,6 @@ bool isUniqueUsername(struct username * users, int size, char* newUser)
 	int i;
 	for (i = 0; i < size; i++) 
 	{
-		fprintf(stderr, "comparing: %s and %s \n", users[i].name, newUser);
 		if (strcmp(users[i].name, newUser) == 0) // two names match so invalid username since not unqiue
 			return false;
 	}
@@ -64,96 +63,137 @@ bool isUniqueUsername(struct username * users, int size, char* newUser)
 	return true;
 }
 
-int main(void)
+int getListener()
 {
-	struct username user; // used to get size
-	struct username * users = malloc(1 * sizeof(user));
-	int numberOfUsers = 0;
-
-	int sock = socket (AF_INET, SOCK_STREAM, 0);
-	if (sock < 0) {
+	int listener = socket(AF_INET, SOCK_STREAM, 0);
+	if (listener < 0) {
 		perror ("Server: cannot open master socket");
 		exit (1);
 	}
 
-	struct sockaddr_in master;
-	master.sin_family = AF_INET;
-	master.sin_addr.s_addr = INADDR_ANY;
-	master.sin_port = htons (MY_PORT);
+	return listener;
+}
 
-	int yes = 1;
-	if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1){
-		perror("cant set socket option");
+int main(void)
+{
+	// int newfd; // max file descriptor number, listening socket descriptor, newly accepted sockect descriptor
+	// struct sockaddr_in remoteaddr; // the remoteaddr is the client addr
+	// socklen_t addrlen;
+	
+	// char buf[256]; // data for client buffer
+	// int nbytes;
+
+	// int i, j,rv;
+	struct username user; // used to get size
+	struct username * users = malloc(1 * sizeof(user));
+	int numberOfUsers = 0;
+
+	int listener = getListener();
+
+	// get us a socket and bind it
+	struct sockaddr_in sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sin_family = AF_INET;
+	sa.sin_addr.s_addr = INADDR_ANY;
+	sa.sin_port = htons(MY_PORT);
+
+	int yes = 1; // set the socket to re-use the address
+	if(setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1){
+		perror("Server: cannot set socket option");
 		exit(1);
 	}
 
-	if (bind (sock, (struct sockaddr*) &master, sizeof (master))) {
+	if (bind(listener, (struct sockaddr*) &sa, sizeof(sa)) < 0) {
 		perror ("Server: cannot bind master socket");
-		exit (1);
+		exit(1);
 	}
 
-	listen (sock, 5);
+	if(listen (listener, 10) == -1)
+	{
+		perror("Server: cannot listen");
+		exit(1);
+	}
 
-	while (1) {
-		fprintf(stderr, "Starting while loop\n");
+	fd_set master, read_fds; // master file descriptor list, and temp file descriptor list
+	FD_ZERO(&master); // clear the master and temp set
+	FD_ZERO(&read_fds);
 
-		struct sockaddr_in from;
-		int fromlength = sizeof (from);
-		int snew = accept (sock, (struct sockaddr*)&from, (socklen_t *)&fromlength);
+	FD_SET(listener, &master); // add the listener to the master set
+	int fdmax = listener; // keep track of the biggest file descriptors, for now its the listener
 
-		if (snew < 0) {
-			perror ("Server: accept failed");
-			exit (1);
-		}
+	while (1) // -------------------------------------------------------- while loop --------------------------------------------------
+	{
+		fprintf(stderr, "========= Starting while loop =========\n");
 
-		sendInitialHandshake(snew);
-		sendNumberOfUsers(snew, numberOfUsers);
-
-		int usernameLen = getUsernameLength(snew);
-		char username[usernameLen + 1]; // required for adding a null terminator
-		recv(snew, &username, usernameLen, 0);
-		username[usernameLen] = '\0';
-		fprintf(stderr, "Client username: %s\n",username);
-
-		if(isUniqueUsername(users, numberOfUsers, username))
+		read_fds = master; // copy it
+		if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
 		{
-			numberOfUsers = numberOfUsers + 1;
-			users = realloc(users, numberOfUsers * sizeof(user));
-			addUserName(users, numberOfUsers, username, usernameLen);
-			printUsers(users, numberOfUsers);
+			perror("Server: cannot select file descriptor");
+			exit(1);
 		}
-		else
+
+		int i;
+		for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
 		{
-			fprintf(stderr, "\n...Username is not unique, closing connection\n");
-			close(snew);
-		}
+			struct sockaddr_in from;
+			int fromlength = sizeof(from);
+			int snew = accept (listener, (struct sockaddr*)&from, (socklen_t *)&fromlength);
 
-		// int keepAliveTime = 3000;
-		// clock_t before = clock()*1000/CLOCKS_PER_SEC;
-		// while(1)
-		// {
-		// 	int keepAlive;
-		// 	int current = clock()*1000/CLOCKS_PER_SEC;
-		// 	if((current - before) >= keepAliveTime)
-		// 	{
-		// 		if(recv(snew, &keepAlive, sizeof(keepAlive), 0) == 0 ||
-		// 			recv(snew, &keepAlive, sizeof(keepAlive), 0) == -1)
-		// 		{
-		// 			fprintf(stderr, "Closing socket connection with client\n");
-		// 			close(snew);
-		// 			break;
-		// 		}
+			if (snew < 0) 
+			{
+				perror ("Server: accept failed");
+				exit (1);
+			}
 
-		// 		if(ntohl(keepAlive) == 0)
-		// 			fprintf(stderr, "recieved keep alice\n");
-		// 		before = clock()*1000/CLOCKS_PER_SEC;
-		// 	}
-		// }
+			sendInitialHandshake(snew);
+			sendNumberOfUsers(snew, numberOfUsers);
 
-			fprintf(stderr, "outside while loop, &users = %p\n", (void*)&users);
+			int usernameLen = getUsernameLength(snew);
+			char username[usernameLen + 1]; // required for adding a null terminator
+			recv(snew, &username, usernameLen, 0);
+			username[usernameLen] = '\0';
+			fprintf(stderr, "Client username: %s\n",username);
+
+			if(isUniqueUsername(users, numberOfUsers, username))
+			{
+				numberOfUsers = numberOfUsers + 1;
+				users = realloc(users, numberOfUsers * sizeof(user));
+
+				fprintf(stderr, "Adding user: %s\n", username);
+				addUserName(users, numberOfUsers, username, usernameLen);
+			}
+			else
+			{
+				fprintf(stderr, "\n...Username is not unique, closing connection\n");
+				close(snew);
+			}
+
+			// int keepAliveTime = 3000;
+			// clock_t before = clock()*1000/CLOCKS_PER_SEC;
+			// while(1)
+			// {
+			// 	int keepAlive;
+			// 	int current = clock()*1000/CLOCKS_PER_SEC;
+			// 	if((current - before) >= keepAliveTime)
+			// 	{
+			// 		if(recv(snew, &keepAlive, sizeof(keepAlive), 0) == 0 ||
+			// 			recv(snew, &keepAlive, sizeof(keepAlive), 0) == -1)
+			// 		{
+			// 			fprintf(stderr, "Closing socket connection with client\n");
+			// 			close(snew);
+			// 			break;
+			// 		}
+
+			// 		if(ntohl(keepAlive) == 0)
+			// 			fprintf(stderr, "recieved keep alice\n");
+			// 		before = clock()*1000/CLOCKS_PER_SEC;
+			// 	}
+			// }
+
 			printUsers(users, numberOfUsers);
 
 			close(snew);
 			fprintf(stderr, "\n");
-	}
+		} // ending for loop, going through all file descriptors
+	}  // ending while loop
 }
