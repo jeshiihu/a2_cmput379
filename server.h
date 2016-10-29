@@ -18,12 +18,14 @@ typedef int bool;
 
 struct username
 {
-	int length;
+	uint8_t length;
 	char* name;
+	int fd;
 };
 
 void printUsers(struct username * users, int numberOfUsers);
-void addUserName(struct username * users, int size, char* name, int nameLen);
+void addUserName(struct username * users, int size, char* name, int nameLen, int fd);
+void deleteUser(struct username * users, int size, int fd);
 
 void sendInitialHandshake(int sock);
 void sendNumberOfUsers(int sock, int numUsers);

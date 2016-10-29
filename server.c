@@ -17,11 +17,31 @@ void printUsers(struct username * users, int numberOfUsers)
 		printf("users[%d] = %s\n", i, users[i].name);
 }
 
-void addUserName(struct username * users, int size, char* name, int nameLen)
+void addUserName(struct username * users, int size, char* name, int nameLen, int fd)
 {
 	users[size - 1].length = nameLen;
+	users[size - 1].fd = fd;
+
 	users[size - 1].name = malloc(nameLen * sizeof(char));
 	strcpy(users[size - 1].name, name);
+}
+
+void deleteUser(struct username * users, int size, int fd)
+{
+	// int i;
+	// struct username user;
+
+	// for(i = 0; i < size; i++)
+	// {
+	// 	if(users[i].fd == fd) // found the user
+	// 	{
+
+	// 	}
+	// 	else
+	// 	{
+	// 		temp[i]
+	// 	}
+	// }
 }
 
 void sendInitialHandshake(int listener)
@@ -163,7 +183,7 @@ int main(void)
 						users = realloc(users, numberOfUsers * sizeof(user));
 
 						printf("Adding user: %s\n", username);
-						addUserName(users, numberOfUsers, username, usernameLen);
+						addUserName(users, numberOfUsers, username, usernameLen, i);
 
 						printUsers(users, numberOfUsers);
 						printf("\n");
@@ -181,8 +201,6 @@ int main(void)
 						fdmax = newfd; // leep track of the max
 
 					printf("Selected Server: new connection from %s:%d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd); // cant print off somethings...
-				
-
 				}
 				else 
 				{ // handling data from clients!!
@@ -199,9 +217,10 @@ int main(void)
 							printf("Error: could not recv from client\n");
 						}
 
+						deleteUser(users, numberOfUsers, i);
+
 						close(i);
 						FD_CLR(i, &master);
-						// get rid of it from users
 					}
 					else
 					{
@@ -238,4 +257,6 @@ int main(void)
 			} // ending if got a new incoming connection
 		} // ending for loop, going through all file descriptors
 	}  // ending while loop
+
+	return 0;
 }

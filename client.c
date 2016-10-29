@@ -7,6 +7,25 @@
 
 int main(int argc, char** argv)
 {
+	if(argc != 5)
+	{
+		printf("Invalid client input. Should be formatted as: chatname hostname portnumber username\n");
+		return 0; 
+	}
+
+	// get the client inputs!
+	char chatname[strlen(argv[1])];
+	strcpy(chatname, argv[1]);
+
+	char hostname[strlen(argv[2])];
+	strcpy(hostname, argv[2]);
+	
+	char portnumber[strlen(argv[3])];
+	strcpy(portnumber, argv[3]);
+	
+	char username[strlen(argv[4])];
+	strcpy(username, argv[4]);
+
 	int	s, number;
 
 	struct	sockaddr_in	server;
@@ -53,14 +72,10 @@ int main(int argc, char** argv)
 			recv(s, &numberOfUsers, sizeof(secondByte),0);
 			fprintf(stderr, "Number of Users:  %d\n", ntohs(numberOfUsers));
 			
-			int i;
-			for(i = 1; i < argc; i++)
-			{
-				int usernameLen = (int)strlen(argv[i]);
-				send(s, &usernameLen, sizeof(usernameLen), 0); // send username length
-				send(s, argv[i], sizeof(argv[i]), 0);
-				fprintf(stderr, "Name: %s\n", argv[i]);
-			}
+			int len = (int)strlen(username);
+			send(s, &len, sizeof(len), 0); // send username length
+			send(s, username, sizeof(username), 0);
+			fprintf(stderr, "Name: %s\n", username);
 
 			// int keepAliveTime = 3000;
 			// clock_t before = clock()*1000/CLOCKS_PER_SEC;
@@ -86,4 +101,6 @@ int main(int argc, char** argv)
 		sleep(5);
 		close(s);
 	}
+
+	return 0;
 }
