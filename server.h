@@ -7,6 +7,9 @@
 #include <string.h>
 #include <time.h>
 
+#include <arpa/inet.h>
+
+
 #define	MY_PORT	2222
 
 typedef int bool;

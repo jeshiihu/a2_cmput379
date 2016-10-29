@@ -10,11 +10,11 @@
  --------------------------------------------------------------------- */
 void printUsers(struct username * users, int numberOfUsers)
 {
-	fprintf(stderr, "Number of users: %d\n", numberOfUsers);
+	printf("Number of users: %d\n", numberOfUsers);
 	
 	int i;
 	for(i = 0; i < numberOfUsers; i++)
-		fprintf(stderr, "users[%d] = %s\n", i, users[i].name);
+		printf("users[%d] = %s\n", i, users[i].name);
 }
 
 void addUserName(struct username * users, int size, char* name, int nameLen)
@@ -26,7 +26,7 @@ void addUserName(struct username * users, int size, char* name, int nameLen)
 
 void sendInitialHandshake(int listener)
 {
-	fprintf(stderr, "sending handshake...\n" );
+	printf("sending handshake...\n" );
 
 	int outnum = htonl(0xCF);
 	send (listener, &outnum, sizeof (outnum), 0);
@@ -37,7 +37,7 @@ void sendInitialHandshake(int listener)
 
 void sendNumberOfUsers(int listener, int numUsers)
 {
-	fprintf(stderr, "sending number of users...\n" );
+	printf("sending number of users...\n" );
 
 	int num = htons(numUsers);
 	send (listener, &num, sizeof(num), 0);
@@ -77,9 +77,7 @@ int getListener()
 int main(void)
 {
 	// int newfd; // max file descriptor number, listening socket descriptor, newly accepted sockect descriptor
-	// struct sockaddr_in remoteaddr; // the remoteaddr is the client addr
-	// socklen_t addrlen;
-	
+		
 	// char buf[256]; // data for client buffer
 	// int nbytes;
 
@@ -135,65 +133,109 @@ int main(void)
 		int i;
 		for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
 		{
-			struct sockaddr_in from;
-			int fromlength = sizeof(from);
-			int snew = accept (listener, (struct sockaddr*)&from, (socklen_t *)&fromlength);
-
-			if (snew < 0) 
+			if(FD_ISSET(i, &read_fds)) // we got one!!
 			{
-				perror ("Server: accept failed");
-				exit (1);
-			}
+				if(i == listener) // handle new connection!
+				{
+					struct sockaddr_in remoteaddr; // the remoteaddr is the client addr
+					socklen_t addrlen = sizeof(remoteaddr);
 
-			sendInitialHandshake(snew);
-			sendNumberOfUsers(snew, numberOfUsers);
+					int newfd = accept(listener, (struct sockaddr*)&remoteaddr, &addrlen);
 
-			int usernameLen = getUsernameLength(snew);
-			char username[usernameLen + 1]; // required for adding a null terminator
-			recv(snew, &username, usernameLen, 0);
-			username[usernameLen] = '\0';
-			fprintf(stderr, "Client username: %s\n",username);
+					if (newfd < 0) 
+					{
+						perror ("Server: accept failed");
+						continue;
+					}
+					
+					sendInitialHandshake(newfd);
+					sendNumberOfUsers(newfd, numberOfUsers);
 
-			if(isUniqueUsername(users, numberOfUsers, username))
-			{
-				numberOfUsers = numberOfUsers + 1;
-				users = realloc(users, numberOfUsers * sizeof(user));
+					int usernameLen = getUsernameLength(newfd);
+					char username[usernameLen + 1]; // required for adding a null terminator
+					recv(newfd, &username, usernameLen, 0);
+					username[usernameLen] = '\0';
+					printf("Client username: %s\n",username);
 
-				fprintf(stderr, "Adding user: %s\n", username);
-				addUserName(users, numberOfUsers, username, usernameLen);
-			}
-			else
-			{
-				fprintf(stderr, "\n...Username is not unique, closing connection\n");
-				close(snew);
-			}
+					if(isUniqueUsername(users, numberOfUsers, username))
+					{
+						numberOfUsers = numberOfUsers + 1;
+						users = realloc(users, numberOfUsers * sizeof(user));
 
-			// int keepAliveTime = 3000;
-			// clock_t before = clock()*1000/CLOCKS_PER_SEC;
-			// while(1)
-			// {
-			// 	int keepAlive;
-			// 	int current = clock()*1000/CLOCKS_PER_SEC;
-			// 	if((current - before) >= keepAliveTime)
-			// 	{
-			// 		if(recv(snew, &keepAlive, sizeof(keepAlive), 0) == 0 ||
-			// 			recv(snew, &keepAlive, sizeof(keepAlive), 0) == -1)
-			// 		{
-			// 			fprintf(stderr, "Closing socket connection with client\n");
-			// 			close(snew);
-			// 			break;
-			// 		}
+						printf("Adding user: %s\n", username);
+						addUserName(users, numberOfUsers, username, usernameLen);
 
-			// 		if(ntohl(keepAlive) == 0)
-			// 			fprintf(stderr, "recieved keep alice\n");
-			// 		before = clock()*1000/CLOCKS_PER_SEC;
-			// 	}
-			// }
+						printUsers(users, numberOfUsers);
+						printf("\n");
+					}
+					else
+					{
+						fprintf(stderr, "\n...Username is not unique, closing connection\n");
+						close(newfd);
+						continue; // skip adding it to the master set
+					}
 
-			printUsers(users, numberOfUsers);
+					// successfully accepted a new selection!
+					FD_SET(newfd, &master); // add to the master set
+					if(newfd > fdmax)
+						fdmax = newfd; // leep track of the max
 
-			close(snew);
-			fprintf(stderr, "\n");
+					printf("Selected Server: new connection from %s:%d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd); // cant print off somethings...
+				
+
+				}
+				else 
+				{ // handling data from clients!!
+					char buf[256]; // data for client buffer, their messages
+					int nbytes;
+					if(nbytes = recv(i, buf, sizeof(buf), 0) <= 0)
+					{
+						if(nbytes == 0) // got error or connection closed by client
+						{
+							printf("Selected Server: socket %d hung up\n", i);
+						}
+						else
+						{
+							printf("Error: could not recv from client\n");
+						}
+
+						close(i);
+						FD_CLR(i, &master);
+						// get rid of it from users
+					}
+					else
+					{
+						// get message and send to everyone...
+					}
+
+
+
+
+					// int keepAliveTime = 3000;
+					// clock_t before = clock()*1000/CLOCKS_PER_SEC;
+					// while(1)
+					// {
+					// 	int keepAlive;
+					// 	int current = clock()*1000/CLOCKS_PER_SEC;
+					// 	if((current - before) >= keepAliveTime)
+					// 	{
+					// 		if(recv(newfd, &keepAlive, sizeof(keepAlive), 0) == 0 ||
+					// 			recv(newfd, &keepAlive, sizeof(keepAlive), 0) == -1)
+					// 		{
+					// 			printf("Closing socket connection with client\n");
+					// 			close(newfd);
+					// 			break;
+					// 		}
+
+					// 		if(ntohl(keepAlive) == 0)
+					// 			printf("recieved keep alice\n");
+					// 		before = clock()*1000/CLOCKS_PER_SEC;
+					// 	}
+					// }
+
+
+				} // ending if/else to handle data from the client
+			} // ending if got a new incoming connection
 		} // ending for loop, going through all file descriptors
 	}  // ending while loop
 }
