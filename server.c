@@ -56,7 +56,6 @@ bool isUniqueUsername(struct username * users, int size, char* newUser)
 	int i;
 	for (i = 0; i < size; i++) 
 	{
-		fprintf(stderr, "for loop iter: %d\n", i);
 		fprintf(stderr, "comparing: %s and %s \n", users[i].name, newUser);
 		if (strcmp(users[i].name, newUser) == 0) // two names match so invalid username since not unqiue
 			return false;
@@ -65,7 +64,7 @@ bool isUniqueUsername(struct username * users, int size, char* newUser)
 	return true;
 }
 
-int main()
+int main(void)
 {
 	struct username user; // used to get size
 	struct username * users = malloc(1 * sizeof(user));
@@ -101,7 +100,6 @@ int main()
 		struct sockaddr_in from;
 		int fromlength = sizeof (from);
 		int snew = accept (sock, (struct sockaddr*)&from, (socklen_t *)&fromlength);
-		fprintf(stderr, "After accept of users: %p\n", (void*)&users);
 
 		if (snew < 0) {
 			perror ("Server: accept failed");
@@ -122,15 +120,11 @@ int main()
 			numberOfUsers = numberOfUsers + 1;
 			users = realloc(users, numberOfUsers * sizeof(user));
 			addUserName(users, numberOfUsers, username, usernameLen);
-
-			// users = realloc(users, numberOfUsers * sizeof(*users));
-			// users[numberOfUsers - 1] = username;
-			fprintf(stderr, "Added user, &users = %p\n", (void*)&users);
 			printUsers(users, numberOfUsers);
 		}
 		else
 		{
-			fprintf(stderr, "close connection\n");
+			fprintf(stderr, "\n...Username is not unique, closing connection\n");
 			close(snew);
 		}
 
@@ -159,7 +153,6 @@ int main()
 			fprintf(stderr, "outside while loop, &users = %p\n", (void*)&users);
 			printUsers(users, numberOfUsers);
 
-			fprintf(stderr, "	closing socket...\n");
 			close(snew);
 			fprintf(stderr, "\n");
 	}

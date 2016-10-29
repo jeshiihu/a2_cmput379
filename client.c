@@ -1,16 +1,5 @@
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <strings.h>
-#include <string.h>
-#include <time.h>
 
-#define	 MY_PORT  2222
-
+#include "client.h"
 /* ---------------------------------------------------------------------
  This is a sample client program for the number server. The client and
  the server need not run on the same machine.				 
@@ -22,9 +11,9 @@ int main(int argc, char** argv)
 
 	struct	sockaddr_in	server;
 
-	struct	hostent		*host;
+	struct	hostent	*host;
 
-	host = gethostbyname ("127.0.0.1");
+	host = gethostbyname("129.128.41.52");
 
 	if (host == NULL) {
 		perror ("Client: cannot get host description");
@@ -32,7 +21,6 @@ int main(int argc, char** argv)
 	}
 
 	while (1) {
-
 		s = socket (AF_INET, SOCK_STREAM, 0);
 
 		if (s < 0) {

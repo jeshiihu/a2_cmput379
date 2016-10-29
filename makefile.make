@@ -1,4 +1,4 @@
-HEADERS = server.h
+HEADERS = server.h client.h
 
 CC = gcc
 
