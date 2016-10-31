@@ -26,17 +26,35 @@ void addUserName(struct username * users, int size, char* name, int nameLen, int
 	strcpy(users[size - 1].name, name);
 }
 
-void deleteUser(struct username * users, int size, int fd)
+struct username* deleteUser(struct username * users, int size, int fd) //deletes users in an ugly fashion of shifting other elements up and freeing space
 {
-	// int i;
-	// struct username user;
+	printf("in deleteUser\n");
+	int index;
+ 	for(index = 0; index < size; index++)
+	{
+	 	//printf("comparing fd to be checked %d to passed fd %d \n",users[index].fd,fd );
+	 	if(users[index].fd == fd) // found the user
+	 	{
+	 		break;
+	 		}
+	 	}
 
-	// for(i = 0; i < size; i++)
-	// {
-	// 	if(users[i].fd == fd) // found the user
-	// 	{
-
-	// 	}
+	//printf("users size: %d deleting fd: %d \n", size, fd);
+	struct username user; // used to get size
+	struct username* tempUsers = malloc((size - 1) * sizeof(user)); //create array of size one less than it was
+	//printf("here\n");
+	if (index != 0) {
+		memcpy(tempUsers, users, (index -1) * sizeof(user)); //copy everything before removed element
+	}
+	//printf("copied before\n");
+	if (index != (size -1)) {
+		memcpy(tempUsers+index, users+index+1, (size - index -1) * sizeof(user)); //copy everything after removed element
+	}
+	//printf("copied after\n");
+	free(users);
+	//printf("freed\n");
+	return tempUsers;
+	
 	// 	else
 	// 	{
 	// 		temp[i]
@@ -66,6 +84,14 @@ void sendNumberOfUsers(int listener, int numUsers)
 int getUsernameLength(int listener)
 {
 	int i;
+	recv(listener, &i, sizeof(i), 0);
+
+	return i;
+}
+
+uint16_t getMessageLength(int listener)
+{
+	uint16_t i;
 	recv(listener, &i, sizeof(i), 0);
 
 	return i;
@@ -183,7 +209,7 @@ int main(void)
 						users = realloc(users, numberOfUsers * sizeof(user));
 
 						printf("Adding user: %s\n", username);
-						addUserName(users, numberOfUsers, username, usernameLen, i);
+						addUserName(users, numberOfUsers, username, usernameLen, newfd); //Calvin: changed i tp newfd
 
 						printUsers(users, numberOfUsers);
 						printf("\n");
@@ -206,7 +232,8 @@ int main(void)
 				{ // handling data from clients!!
 					char buf[256]; // data for client buffer, their messages
 					int nbytes;
-					if(nbytes = recv(i, buf, sizeof(buf), 0) <= 0)
+					int messageLength;
+					if((nbytes = recv(i, &messageLength, sizeof(messageLength), 0)) <= 0)
 					{
 						if(nbytes == 0) // got error or connection closed by client
 						{
@@ -217,18 +244,39 @@ int main(void)
 							printf("Error: could not recv from client\n");
 						}
 
-						deleteUser(users, numberOfUsers, i);
-
+						users = deleteUser(users, numberOfUsers, i); //delete user that disconnected
+						numberOfUsers = numberOfUsers -1;
+						printf("after deleteUser\n");
+						printUsers(users, numberOfUsers);
 						close(i);
 						FD_CLR(i, &master);
 					}
 					else
 					{
 						// get message and send to everyone...
+						messageLength = ntohs(messageLength);
+						printf("message length: %d\n", messageLength);
+
+						char message[messageLength + 1]; // required for adding a null terminator
+						recv(i, &message, messageLength, 0);
+						message[messageLength] = '\0';
+						printf("message recieved: %s\n", message);
+
+						int index;
+						for(index = 0; index < numberOfUsers; index++) {
+
+							int fd = users[index].fd;
+
+							int messageLengthInNBO = htons(messageLength);
+							send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
+
+							send(fd, message, sizeof(message), 0);
+							printf("sent message: %s to fd: %d \n",message, fd );
+						}
+
+
+
 					}
-
-
-
 
 					// int keepAliveTime = 3000;
 					// clock_t before = clock()*1000/CLOCKS_PER_SEC;

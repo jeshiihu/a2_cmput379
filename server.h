@@ -25,10 +25,11 @@ struct username
 
 void printUsers(struct username * users, int numberOfUsers);
 void addUserName(struct username * users, int size, char* name, int nameLen, int fd);
-void deleteUser(struct username * users, int size, int fd);
+struct username* deleteUser(struct username * users, int size, int fd);
 
 void sendInitialHandshake(int sock);
 void sendNumberOfUsers(int sock, int numUsers);
 
 int getUsernameLength(int sock);
+uint16_t getMessageLength(int sock);
 bool isUniqueUsername(struct username * users, int size, char* newUser);

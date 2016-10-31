@@ -4,6 +4,28 @@
  This is a sample client program for the number server. The client and
  the server need not run on the same machine.				 
  --------------------------------------------------------------------- */
+char *inputMessage(FILE* fp, size_t size){
+	char *str;
+	int ch;
+	size_t len = 0;
+	str = realloc(NULL, size * sizeof(*str));
+	if(!str) {
+		return str;
+	} 
+	while (EOF != (ch=fgetc(fp)) && ch != '\n') {
+		str[len++]=ch;
+		if (len==size) {
+			str = realloc(str, sizeof(*str)*(size+=size));
+			if (!str) {
+				return str;
+			}
+		}
+	}
+	str[len++] = '\0';
+
+	return realloc(str, sizeof(*str)*len);
+}
+
 
 int main(int argc, char** argv)
 {
@@ -32,7 +54,7 @@ int main(int argc, char** argv)
 
 	struct	hostent	*host;
 
-	host = gethostbyname("129.128.41.52");
+	host = gethostbyname("10.0.2.15");
 
 	if (host == NULL) {
 		perror ("Client: cannot get host description");
@@ -81,6 +103,47 @@ int main(int argc, char** argv)
 			// clock_t before = clock()*1000/CLOCKS_PER_SEC;
 			while(1)
 			{
+				char *message;
+				uint16_t messageLength;
+				
+				if(message = inputMessage(stdin, sizeof(uint16_t))){
+					messageLength = strlen(message);
+
+					int messageLengthInNBO = htons(messageLength);
+					send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
+
+					char sentMessage[messageLength];
+					strcpy(sentMessage, message);
+
+					send(s, sentMessage, sizeof(sentMessage), 0);
+					
+				}
+				printf("message sent: %s\n", message);
+				printf("message length: %d\n", messageLength);
+
+
+				free(message);
+
+				uint16_t recvMessageLength;
+				if (recv(s, &recvMessageLength, sizeof(recvMessageLength), 0)){
+					recvMessageLength = ntohs(recvMessageLength);
+					printf("message recieved length: %d\n",recvMessageLength );
+
+					char recvMessage[recvMessageLength + 1]; // required for adding a null terminator
+					recv(s, &recvMessage, recvMessageLength, 0);
+					recvMessage[recvMessageLength] = '\0';
+					printf("message recieved: %s\n", recvMessage);
+				}
+
+				//char inputMessage[250];
+				//scanf("%s", inputMessage);
+				//printf("after scanf\n");
+				//char message[strlen(inputMessage)];
+				//printf("message length: %d\n", strlen(inputMessage));
+				//strcpy(message, inputMessage);
+				//printf("after copy\n");
+				//printf("%s\n,", message);
+
 				// int current = clock()*1000/CLOCKS_PER_SEC;
 				// if((current - before) >= keepAliveTime)
 				// {
