@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 
 	struct	hostent	*host;
 
-	host = gethostbyname("10.0.2.15");
+	host = gethostbyname("129.128.41.48");
 
 	if (host == NULL) {
 		perror ("Client: cannot get host description");
