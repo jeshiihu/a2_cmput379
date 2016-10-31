@@ -222,6 +222,7 @@ int main(void)
 					}
 
 					// successfully accepted a new selection!
+
 					FD_SET(newfd, &master); // add to the master set
 					if(newfd > fdmax)
 						fdmax = newfd; // leep track of the max
@@ -263,19 +264,23 @@ int main(void)
 						printf("message recieved: %s\n", message);
 
 						int index;
-						for(index = 0; index < numberOfUsers; index++) {
-
+						for(index = 0; index < numberOfUsers; index++) 
+						{
 							int fd = users[index].fd;
 
 							int messageLengthInNBO = htons(messageLength);
-							send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
+							int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
+							printf("send byte: %d\n",sendByte);
+							int k;
+							for(k = 0; k < messageLength; k++)
+							{
+								int byteSent = send(fd, &message[k], sizeof(message[k]), 0);
+								printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
+							}
 
-							send(fd, message, sizeof(message), 0);
-							printf("sent message: %s to fd: %d \n",message, fd );
+							// send(fd, message, sizeof(message), 0);
+							printf("sent message: %s to fd: %d \n",message, fd);
 						}
-
-
-
 					}
 
 					// int keepAliveTime = 3000;

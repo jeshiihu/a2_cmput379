@@ -101,40 +101,59 @@ int main(int argc, char** argv)
 
 			// int keepAliveTime = 3000;
 			// clock_t before = clock()*1000/CLOCKS_PER_SEC;
+				pid_t forkID = fork();
 			while(1)
 			{
+				// printf("while\n");
 				char *message;
 				uint16_t messageLength;
 				
-				if(message = inputMessage(stdin, sizeof(uint16_t))){
-					messageLength = strlen(message);
+				
+				if(forkID == 0) // if parent then always wait for client input message
+				{
+					if(message = inputMessage(stdin, sizeof(uint16_t)))
+					{
+						messageLength = strlen(message);
 
-					int messageLengthInNBO = htons(messageLength);
-					send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
+						int messageLengthInNBO = htons(messageLength);
+						send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
 
-					char sentMessage[messageLength];
-					strcpy(sentMessage, message);
+						char sentMessage[messageLength];
+						strcpy(sentMessage, message);
 
-					send(s, sentMessage, sizeof(sentMessage), 0);
-					
+						send(s, sentMessage, sizeof(sentMessage), 0);
+					}
 				}
-				printf("message sent: %s\n", message);
-				printf("message length: %d\n", messageLength);
+				else // child process wants to always listen to the incoming messages
+				{
+				// printf("message sent: %s\n", message);
+				// printf("message length: %d\n", messageLength);
+					free(message);
 
+					uint16_t recvMessageLength;
+					int recvByte;
+					if (recvByte = (recv(s, &recvMessageLength, sizeof(recvMessageLength), MSG_DONTWAIT) > 0)){
+						recvMessageLength = ntohs(recvMessageLength);
+						printf("message recieved length: %d\n",recvMessageLength );
 
-				free(message);
+						char recvMessage[recvMessageLength + 1];
+						
+						int currentBytesRead = 0;
+						while(currentBytesRead < recvMessageLength)
+						{
+							char c;
+							int bytesReceived = recv(s, &c, sizeof(c), 0);
 
-				uint16_t recvMessageLength;
-				if (recv(s, &recvMessageLength, sizeof(recvMessageLength), 0)){
-					recvMessageLength = ntohs(recvMessageLength);
-					printf("message recieved length: %d\n",recvMessageLength );
+							if (strlen(&c) != 0) {
+								recvMessage[currentBytesRead] = c;
+								currentBytesRead = currentBytesRead + bytesReceived;
+							}
+						}
 
-					char recvMessage[recvMessageLength + 1]; // required for adding a null terminator
-					recv(s, &recvMessage, recvMessageLength, 0);
-					recvMessage[recvMessageLength] = '\0';
-					printf("message recieved: %s\n", recvMessage);
+						recvMessage[recvMessageLength] = '\0';
+						printf("message recieved: %s\n", recvMessage);
+					}
 				}
-
 				//char inputMessage[250];
 				//scanf("%s", inputMessage);
 				//printf("after scanf\n");
