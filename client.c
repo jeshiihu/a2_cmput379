@@ -53,8 +53,7 @@ int main(int argc, char** argv)
 	struct	sockaddr_in	server;
 
 	struct	hostent	*host;
-
-	host = gethostbyname("129.128.41.48");
+	host = gethostbyname(hostname);
 
 	if (host == NULL) {
 		perror ("Client: cannot get host description");
@@ -134,8 +133,7 @@ int main(int argc, char** argv)
 					int recvByte;
 					if (recvByte = (recv(s, &recvMessageLength, sizeof(recvMessageLength), MSG_DONTWAIT) > 0)){
 						recvMessageLength = ntohs(recvMessageLength);
-						printf("message recieved length: %d\n",recvMessageLength );
-
+						// printf("message recieved length: %d\n",recvMessageLength );
 						char recvMessage[recvMessageLength + 1];
 						
 						int currentBytesRead = 0;

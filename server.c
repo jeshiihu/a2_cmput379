@@ -35,31 +35,31 @@ struct username* deleteUser(struct username * users, int size, int fd) //deletes
 	 	//printf("comparing fd to be checked %d to passed fd %d \n",users[index].fd,fd );
 	 	if(users[index].fd == fd) // found the user
 	 	{
+	 		printf("deleting user: %s at index %d\n", users[index].name, index);
 	 		break;
-	 		}
 	 	}
+	}
 
-	//printf("users size: %d deleting fd: %d \n", size, fd);
 	struct username user; // used to get size
 	struct username* tempUsers = malloc((size - 1) * sizeof(user)); //create array of size one less than it was
-	//printf("here\n");
-	if (index != 0) {
-		memcpy(tempUsers, users, (index -1) * sizeof(user)); //copy everything before removed element
+
+	if(index == 0)	// want to remove the first element, so copy every thing before this element
+	{
+		memcpy(tempUsers, users+1, (size - 1) * sizeof(user));
 	}
-	//printf("copied before\n");
-	if (index != (size -1)) {
-		memcpy(tempUsers+index, users+index+1, (size - index -1) * sizeof(user)); //copy everything after removed element
+	else if(index == (size-1)) // want to remove the last element so copy everything until the last
+	{
+		memcpy(tempUsers, users, (size - 1) * sizeof(user));
 	}
-	//printf("copied after\n");
+	else // want to remove an element in between, copy before and then copy after
+	{
+		memcpy(tempUsers, users, (index) * sizeof(user));
+		memcpy(tempUsers+index, users+index+1, (size-index-1) * sizeof(user));
+	}
+
 	free(users);
-	//printf("freed\n");
-	return tempUsers;
 	
-	// 	else
-	// 	{
-	// 		temp[i]
-	// 	}
-	// }
+	return tempUsers;
 }
 
 void sendInitialHandshake(int listener)
@@ -282,7 +282,6 @@ int main(void)
 							printf("sent message: %s to fd: %d \n",message, fd);
 						}
 					}
-
 					// int keepAliveTime = 3000;
 					// clock_t before = clock()*1000/CLOCKS_PER_SEC;
 					// while(1)
@@ -304,8 +303,6 @@ int main(void)
 					// 		before = clock()*1000/CLOCKS_PER_SEC;
 					// 	}
 					// }
-
-
 				} // ending if/else to handle data from the client
 			} // ending if got a new incoming connection
 		} // ending for loop, going through all file descriptors
