@@ -26,19 +26,23 @@ void addUserName(struct username * users, int size, char* name, int nameLen, int
 	strcpy(users[size - 1].name, name);
 }
 
-struct username* deleteUser(struct username * users, int size, int fd) //deletes users in an ugly fashion of shifting other elements up and freeing space
+int getUserIndex(struct username * users, int size, int fd)
 {
-	printf("in deleteUser\n");
 	int index;
  	for(index = 0; index < size; index++)
 	{
 	 	//printf("comparing fd to be checked %d to passed fd %d \n",users[index].fd,fd );
 	 	if(users[index].fd == fd) // found the user
-	 	{
-	 		printf("deleting user: %s at index %d\n", users[index].name, index);
 	 		break;
-	 	}
 	}
+
+	return index;
+}
+
+struct username* deleteUser(struct username * users, int size, int fd) //deletes users in an ugly fashion of shifting other elements up and freeing space
+{
+	printf("in deleteUser\n");
+	int index = getUserIndex(users, size, fd);
 
 	struct username user; // used to get size
 	struct username* tempUsers = malloc((size - 1) * sizeof(user)); //create array of size one less than it was
@@ -58,7 +62,7 @@ struct username* deleteUser(struct username * users, int size, int fd) //deletes
 	}
 
 	free(users);
-	
+
 	return tempUsers;
 }
 
@@ -118,6 +122,31 @@ int getListener()
 	}
 
 	return listener;
+}
+
+void sendMessageToAllUsers(struct username * users, int numberOfUsers, int messageLength, char * message)
+{
+	int index;
+	for(index = 0; index < numberOfUsers; index++) 
+	{
+		int fd = users[index].fd;
+
+		int flag = htonl(0x00); // send regular message flag
+		send(fd, &flag, sizeof(flag), 0);
+
+		int messageLengthInNBO = htons(messageLength);
+		int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
+		// printf("send byte: %d\n",sendByte);
+		int k;
+		for(k = 0; k < messageLength; k++)
+		{
+			int byteSent = send(fd, &message[k], sizeof(message[k]), 0);
+			// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
+		}
+
+		// send(fd, message, sizeof(message), 0);
+		printf("sent message: %s to fd: %d \n",message, fd);
+	}
 }
 
 int main(void)
@@ -222,7 +251,6 @@ int main(void)
 					}
 
 					// successfully accepted a new selection!
-
 					FD_SET(newfd, &master); // add to the master set
 					if(newfd > fdmax)
 						fdmax = newfd; // leep track of the max
@@ -245,9 +273,16 @@ int main(void)
 							printf("Error: could not recv from client\n");
 						}
 
+						int index = getUserIndex(users, numberOfUsers, i);
+						// sendMessageToAllUsers(users, numberOfUsers, users[index].length, users[index].name);
+
 						users = deleteUser(users, numberOfUsers, i); //delete user that disconnected
+
+
 						numberOfUsers = numberOfUsers -1;
 						printf("after deleteUser\n");
+
+
 						printUsers(users, numberOfUsers);
 						close(i);
 						FD_CLR(i, &master);
@@ -263,24 +298,26 @@ int main(void)
 						message[messageLength] = '\0';
 						printf("message recieved: %s\n", message);
 
-						int index;
-						for(index = 0; index < numberOfUsers; index++) 
-						{
-							int fd = users[index].fd;
+						sendMessageToAllUsers(users, numberOfUsers, messageLength, message);
 
-							int messageLengthInNBO = htons(messageLength);
-							int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
-							printf("send byte: %d\n",sendByte);
-							int k;
-							for(k = 0; k < messageLength; k++)
-							{
-								int byteSent = send(fd, &message[k], sizeof(message[k]), 0);
-								printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
-							}
+						// int index;
+						// for(index = 0; index < numberOfUsers; index++) 
+						// {
+						// 	int fd = users[index].fd;
 
-							// send(fd, message, sizeof(message), 0);
-							printf("sent message: %s to fd: %d \n",message, fd);
-						}
+						// 	int messageLengthInNBO = htons(messageLength);
+						// 	int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
+						// 	printf("send byte: %d\n",sendByte);
+						// 	int k;
+						// 	for(k = 0; k < messageLength; k++)
+						// 	{
+						// 		int byteSent = send(fd, &message[k], sizeof(message[k]), 0);
+						// 		printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
+						// 	}
+
+						// 	// send(fd, message, sizeof(message), 0);
+						// 	printf("sent message: %s to fd: %d \n",message, fd);
+						// }
 					}
 					// int keepAliveTime = 3000;
 					// clock_t before = clock()*1000/CLOCKS_PER_SEC;

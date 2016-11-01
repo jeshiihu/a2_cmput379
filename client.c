@@ -149,7 +149,7 @@ int main(int argc, char** argv)
 						}
 
 						recvMessage[recvMessageLength] = '\0';
-						printf("message recieved: %s\n", recvMessage);
+						printf("%s\n", recvMessage);
 					}
 				}
 				//char inputMessage[250];
