@@ -4,7 +4,8 @@
  This is a sample client program for the number server. The client and
  the server need not run on the same machine.				 
  --------------------------------------------------------------------- */
-char *inputMessage(FILE* fp, size_t size){
+char *inputMessage(FILE* fp, size_t size)
+{
 	char *str;
 	int ch;
 	size_t len = 0;
@@ -26,6 +27,50 @@ char *inputMessage(FILE* fp, size_t size){
 	return realloc(str, sizeof(*str)*len);
 }
 
+void getStringFromRecv(int s, char * str, int len)
+{
+	int currentBytesRead = 0;
+	while(currentBytesRead < len)
+	{
+		char c;
+		int bytesReceived = recv(s, &c, sizeof(c), 0);
+
+		if (strlen(&c) != 0) {
+			str[currentBytesRead] = c;
+			currentBytesRead = currentBytesRead + bytesReceived;
+		}
+	}
+
+	str[len] = '\0';
+}
+
+void receiveMessage(int s, int flag) // expecting length string (msglen msg is flag is 0x00)
+{
+	uint16_t userLen;
+	if (recv(s, &userLen, sizeof(userLen), 0) > 0) // get the first length
+	{
+		userLen = ntohs(userLen);
+		char name[userLen + 1];
+		getStringFromRecv(s, name, userLen);
+		printf("User %s ", name);
+	}
+
+	if(flag == 0x00) // regular message
+	{
+		uint16_t msgLenth;
+		if (recv(s, &msgLenth, sizeof(msgLenth), 0) > 0)
+		{
+			int msgLenth = ntohs(msgLenth);
+			char msg[msgLenth + 1];
+			getStringFromRecv(s, msg, msgLenth);
+			printf(": %s:\n", msg);
+		}
+	}
+	else if(flag == 0x01)
+		printf("joined the server!\n");
+	else if(flag == 0x02)
+		printf("disconnected from server.\n");
+}
 
 int main(int argc, char** argv)
 {
@@ -100,13 +145,12 @@ int main(int argc, char** argv)
 
 			// int keepAliveTime = 3000;
 			// clock_t before = clock()*1000/CLOCKS_PER_SEC;
-				pid_t forkID = fork();
+			pid_t forkID = fork();
 			while(1)
 			{
 				// printf("while\n");
 				char *message;
 				uint16_t messageLength;
-				
 				
 				if(forkID == 0) // if parent then always wait for client input message
 				{
@@ -121,36 +165,15 @@ int main(int argc, char** argv)
 						strcpy(sentMessage, message);
 
 						send(s, sentMessage, sizeof(sentMessage), 0);
+	
+						free(message);
 					}
 				}
 				else // child process wants to always listen to the incoming messages
 				{
-				// printf("message sent: %s\n", message);
-				// printf("message length: %d\n", messageLength);
-					free(message);
-
-					uint16_t recvMessageLength;
-					int recvByte;
-					if (recvByte = (recv(s, &recvMessageLength, sizeof(recvMessageLength), MSG_DONTWAIT) > 0)){
-						recvMessageLength = ntohs(recvMessageLength);
-						// printf("message recieved length: %d\n",recvMessageLength );
-						char recvMessage[recvMessageLength + 1];
-						
-						int currentBytesRead = 0;
-						while(currentBytesRead < recvMessageLength)
-						{
-							char c;
-							int bytesReceived = recv(s, &c, sizeof(c), 0);
-
-							if (strlen(&c) != 0) {
-								recvMessage[currentBytesRead] = c;
-								currentBytesRead = currentBytesRead + bytesReceived;
-							}
-						}
-
-						recvMessage[recvMessageLength] = '\0';
-						printf("%s\n", recvMessage);
-					}
+					int messageFlag;
+					if(recv(s, &messageFlag, sizeof(messageFlag, 0), 0) > 0) // received the flag
+						receiveMessage(s, messageFlag);
 				}
 				//char inputMessage[250];
 				//scanf("%s", inputMessage);

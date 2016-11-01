@@ -11,3 +11,8 @@
 
 
 #define	 MY_PORT  2222
+
+char *inputMessage(FILE* fp, size_t size);
+void getStringFromRecv(int s, char * str, int len);
+void receiveMessage(int s, int flag);
+
