@@ -9,7 +9,7 @@
 #include <string.h>
 #include <time.h>
 
-#define	 MY_PORT  2222
+// #define	 MY_PORT  2222
 
 typedef int bool;
 #define true 1

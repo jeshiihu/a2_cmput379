@@ -136,25 +136,22 @@ void receiveMessage(int s, uint8_t flag) // expecting length string (msglen msg 
 
 int main(int argc, char** argv)
 {	
-
-	if(argc != 5)
+	if(argc != 4)
 	{
-		printf("Invalid client input. Should be formatted as: chatname hostname portnumber username\n");
+		printf("Invalid client input. Should be formatted as: hostname portnumber username\n");
 		return 0; 
 	}
 
 	// get the client inputs!
-	char chatname[strlen(argv[1])];
-	strcpy(chatname, argv[1]);
-
-	char hostname[strlen(argv[2])];
-	strcpy(hostname, argv[2]);
+	char hostname[strlen(argv[1])];
+	strcpy(hostname, argv[1]);
 	
-	char portnumber[strlen(argv[3])];
-	strcpy(portnumber, argv[3]);
+	char portnumberStr[strlen(argv[2])];
+	strcpy(portnumberStr, argv[2]);
+	uint16_t port = (uint16_t)atoi(portnumberStr);
 	
-	char username[strlen(argv[4])];
-	strcpy(username, argv[4]);
+	char username[strlen(argv[3])];
+	strcpy(username, argv[3]);
 
 	int	s, number;
 
@@ -179,7 +176,7 @@ int main(int argc, char** argv)
 		bzero (&server, sizeof (server));
 		bcopy (host->h_addr, & (server.sin_addr), host->h_length);
 		server.sin_family = host->h_addrtype;
-		server.sin_port = htons (MY_PORT);
+		server.sin_port = htons(port);
 
 		if (connect (s, (struct sockaddr*) & server, sizeof (server))) {
 			perror ("Client: cannot connect to server");
