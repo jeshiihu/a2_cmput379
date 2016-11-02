@@ -27,6 +27,19 @@ char *inputMessage(FILE* fp, size_t size)
 	return realloc(str, sizeof(*str)*len);
 }
 
+bool receivedHandshake(int s)
+{
+	int firstByte, secondByte;
+	recv(s, &firstByte, sizeof (firstByte),0);
+	// fprintf (stderr, "Process: %d, first byte: %x\n", getpid (), ntohl (firstByte));
+	
+	recv(s, &secondByte, sizeof(secondByte),0);
+	// printf("Process: %d, gets number: %x\n", getpid (), ntohl(secondByte));
+	if(ntohl(firstByte) == 0xcf && ntohl(secondByte) == 0xa7)
+		return true;
+
+	return false;
+}
 
 void getStringFromRecv(int s, char * str, int len)
 {
@@ -45,6 +58,14 @@ void getStringFromRecv(int s, char * str, int len)
 	str[len] = '\0';
 }
 
+// // COMMON FUNCTION MOVE TO A COMMON FILE LATER!!!
+// void addUserName(char* name, int nameLen)
+// {
+// 	users[numberOfUsers - 1].length = nameLen;
+// 	users[numberOfUsers - 1].name = malloc(nameLen * sizeof(char));
+// 	strcpy(users[numberOfUsers - 1].name, name);
+// }
+
 void receiveMessage(int s, int flag) // expecting length string (msglen msg is flag is 0x00)
 {
 	uint16_t userLen;
@@ -59,7 +80,7 @@ void receiveMessage(int s, int flag) // expecting length string (msglen msg is f
 	char name[userLen + 1];
 	getStringFromRecv(s, name, userLen);
 
-	if(flag == 0) // regular message
+	if(ntohl(flag) == 0x00) // regular message
 	{
 		uint16_t msgLenth;
 		if((bytes = recv(s, &msgLenth, sizeof(msgLenth), 0)) > 0)
@@ -70,18 +91,41 @@ void receiveMessage(int s, int flag) // expecting length string (msglen msg is f
 			printf("User %s: %s\n", name, msg);
 		}
 	}
-	else if(flag == 1)
+	else if(ntohl(flag) == 0x01)
 	{
 		printf("User %s: joined the server!\n", name);
+		// addUserName(name, userLen +1);
+		// printCurrentUserList();
 	}
-	else if(flag == 2)
+	else if(ntohl(flag) == 0x02)
 		printf("User %s: disconnected from server.\n", name);
 }
 
+
+
+// void populateUserList(int s, struct username * users, int size, int numOfUsersToAdd)
+// {
+// 	int i;
+// 	for(i = 0; i < numberOfUsers; i++)
+// 	{
+// 		// addUserName(users, size,)
+// 		;
+// 	}
+// }
+
+// void printCurrentUserList()
+// {
+// 	printf("Number of users: %d\n", numberOfUsers);
+	
+// 	int i;
+// 	for(i = 0; i < numberOfUsers; i++)
+// 		printf("users[%d] = %s\n", i, users[i].name);
+// }
+
+
+
 int main(int argc, char** argv)
 {	
-	struct username user;
-	struct username * users;
 
 	if(argc != 5)
 	{
@@ -133,26 +177,18 @@ int main(int argc, char** argv)
 		}
 
 		// if flag is 0 then it works exactly like read();
-		int firstByte, secondByte;
-		recv(s, &firstByte, sizeof (firstByte),0);
-		fprintf (stderr, "Process: %d, first byte: %x\n", getpid (), ntohl (firstByte));
-		
-		recv(s, &secondByte, sizeof(secondByte),0);
-		printf("Process: %d, gets number: %x\n", getpid (), ntohl(secondByte));
-
-		if(ntohl(firstByte) == 0xcf && ntohl(secondByte) == 0xa7)
+		if(receivedHandshake(s))
 		{
-			printf("confirm\n");
 			int numberOfUsers;
-			recv(s, &numberOfUsers, sizeof(secondByte),0);
+			recv(s, &numberOfUsers, sizeof(numberOfUsers),0);
 			printf("Number of Users:  %d\n", ntohs(numberOfUsers));
+			// getCurrentUserList(s, users, numberOfUsers);
 			
 			int len = (int)strlen(username);
 			send(s, &len, sizeof(len), 0); // send username length
 			send(s, username, sizeof(username), 0);
 			printf("Name: %s\n", username);
 
-			// getCurrentUserList(s, users, numberOfUsers);
 
 			pid_t forkID = fork();
 			while(1)
@@ -183,24 +219,9 @@ int main(int argc, char** argv)
 					if(recv(s, &messageFlag, sizeof(messageFlag, 0), 0) > 0) // received the flag
 						receiveMessage(s, messageFlag);
 				}
-
-				// int current = clock()*1000/CLOCKS_PER_SEC;
-				// if((current - before) >= keepAliveTime)
-				// {
-				// 	printf("Clock: %d, Before: %d\n", current, before);
-				// 	int keepAliveLen = htonl (0);
-				// 	if(send (s, &keepAliveLen, sizeof(keepAliveLen), 0) == -1)
-				// 	{	
-				// 		printf("Connection closed.\n");
-				// 		close(s);
-				// 	}
-
-				// 	before = clock()*1000/CLOCKS_PER_SEC;
-				// }	
 			}
 		}
 
-		// keep alive
 		close(s);
 	}
 

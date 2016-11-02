@@ -11,15 +11,26 @@
 
 #define	 MY_PORT  2222
 
+typedef int bool;
+#define true 1
+#define false 0
+
 struct username
 {
 	uint8_t length;
 	char* name;
-	int fd;
 };
 
+// struct username user;
+// struct username * users;
+// int numberOfUsers = 0;
 
 char *inputMessage(FILE* fp, size_t size);
+
+bool receivedHandshake(int s);
+
 void getStringFromRecv(int s, char * str, int len);
 void receiveMessage(int s, int flag);
+
+// void getCurrentUserList(int s, struct username * users, int numberOfUsers);
 
