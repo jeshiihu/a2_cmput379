@@ -58,16 +58,13 @@ void getStringFromRecv(int s, char * str, uint8_t len)
 	str[len] = '\0';
 }
 
-// // COMMON FUNCTION MOVE TO A COMMON FILE LATER!!!
-// void addUserName(char* name, int nameLen)
-// {
-// 	users[numberOfUsers - 1].length = nameLen;
-// 	users[numberOfUsers - 1].name = malloc(nameLen * sizeof(char));
-// 	strcpy(users[numberOfUsers - 1].name, name);
-// }
-
-void receiveMessage(int s, uint8_t flag) // expecting length string (msglen msg is flag is 0x00)
+void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numberOfUsers) // expecting length string (msglen msg is flag is 0x00)
 {
+	printf("the flag is: %x \n", flag);
+	uint8_t msg = 0x00;
+	uint8_t join = 0x01;
+	uint8_t leave = 0x02;
+
 	uint8_t userLen;
 	int bytes;
 	if ((bytes = recv(s, &userLen, sizeof(userLen), 0)) < 0) // get the first length
@@ -76,85 +73,105 @@ void receiveMessage(int s, uint8_t flag) // expecting length string (msglen msg 
 		return;
 	}
 
-	// userLen = ntohs(userLen);
 	char name[userLen + 1];
 	getStringFromRecv(s, name, userLen);
 
-	// if(flag == ((uint8_t)0x00)) // regular message
-	// {
-	// 	userLen = ntohs(userLen);
-	// 	char name[userLen + 1];
-	// 	getStringFromRecv(s, name, userLen);
-	// 	printf("User %s of length: %d \n", name, userLen);
-	// }
-
-	printf("the flag is: %d \n", flag);
-
-	if(flag == ((uint8_t)0x00)) // regular message
+	if(flag == msg) // regular message
 	{
 		uint16_t msgLenth;
 		if((bytes = recv(s, &msgLenth, sizeof(msgLenth), 0)) > 0)
 		{
-			int msgLenth = ntohs(msgLenth);
+			uint16_t msgLenth = ntohs(msgLenth);
 			char msg[msgLenth + 1];
 			getStringFromRecv(s, msg, msgLenth);
 			printf("User %s: %s\n", name, msg);
 		}
 	}
-	else if(flag == ((uint8_t)0x01))
+	else if(flag == join)
 	{
 		printf("User %s: joined the server!\n", name);
-		// addUserName(name, userLen +1);
+		addUserName(users, numberOfUsers, name, userLen +1);
 		// printCurrentUserList();
 	}
-	else if(flag == ((uint8_t)0x02))
+	else if(flag == leave)
 		printf("User %s: disconnected from server.\n", name);
 }
 
+void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, int len)
+{
+	users = realloc(users, (*numberOfUsers) * sizeof(struct username));
 
+	users[*numberOfUsers].length = len;
+	printf("seg?\n");
 
-// void populateUserList(int s, struct username * users, int size, int numOfUsersToAdd)
-// {
-// 	int i;
-// 	for(i = 0; i < numberOfUsers; i++)
-// 	{
-// 		// addUserName(users, size,)
-// 		;
-// 	}
-// }
-
-// void printCurrentUserList()
-// {
-// 	printf("Number of users: %d\n", numberOfUsers);
+	users[*numberOfUsers].name = malloc(len * sizeof(char));
+	strcpy(users[*numberOfUsers].name, name);
+	printf("seg?\n");
 	
-// 	int i;
-// 	for(i = 0; i < numberOfUsers; i++)
-// 		printf("users[%d] = %s\n", i, users[i].name);
-// }
+	*numberOfUsers = *numberOfUsers + 1;
+
+	printCurrentUserList(users, *numberOfUsers);
+}
+
+
+void populateUserList(int s, struct username * users, uint16_t numberOfUsers)
+{
+	printf("Number of Users:  %d\n", ntohs(numberOfUsers));
+	users = realloc(users, numberOfUsers * sizeof(struct username));
+
+	int i;
+	for(i = 0; i < numberOfUsers; i++)
+	{
+		uint8_t len;
+		int bytes;
+		while(1) 
+		{ 
+			bytes = recv(s, &len, sizeof(len), 0);
+			printf("%d bytes --> %d len\n", bytes, len);
+			if(bytes == 1) 
+				break;
+		}
+		printf("%d bytes for user len: %d\n", bytes, len);
+
+		users[i].length = len;
+	}
+
+	// done populateUserLis
+}
+
+void printCurrentUserList(struct username * users, uint16_t numberOfUsers)
+{
+	printf("Number of users: %d\n", numberOfUsers);
+	
+	int i;
+	for(i = 0; i < numberOfUsers; i++)
+		printf("users[%d] = %s\n", i, users[i].name);
+}
 
 
 
 int main(int argc, char** argv)
 {	
-
-	if(argc != 5)
+	if(argc != 4)
 	{
-		printf("Invalid client input. Should be formatted as: chatname hostname portnumber username\n");
+		printf("Invalid client input. Should be formatted as: hostname portnumber username\n");
 		return 0; 
 	}
 
-	// get the client inputs!
-	char chatname[strlen(argv[1])];
-	strcpy(chatname, argv[1]);
+	struct username user;
+	struct username * users = malloc(1 * sizeof(user));
+	uint16_t numberOfUsers = 0;
 
-	char hostname[strlen(argv[2])];
-	strcpy(hostname, argv[2]);
+	// get the client inputs!
+	char hostname[strlen(argv[1])];
+	strcpy(hostname, argv[1]);
 	
-	char portnumber[strlen(argv[3])];
-	strcpy(portnumber, argv[3]);
+	char portnumberStr[strlen(argv[2])];
+	strcpy(portnumberStr, argv[2]);
+	uint16_t port = (uint16_t)atoi(portnumberStr);
 	
-	char username[strlen(argv[4])];
-	strcpy(username, argv[4]);
+	char username[strlen(argv[3])];
+	strcpy(username, argv[3]);
 
 	int	s, number;
 
@@ -179,7 +196,7 @@ int main(int argc, char** argv)
 		bzero (&server, sizeof (server));
 		bcopy (host->h_addr, & (server.sin_addr), host->h_length);
 		server.sin_family = host->h_addrtype;
-		server.sin_port = htons (MY_PORT);
+		server.sin_port = htons(port);
 
 		if (connect (s, (struct sockaddr*) & server, sizeof (server))) {
 			perror ("Client: cannot connect to server");
@@ -189,16 +206,17 @@ int main(int argc, char** argv)
 		// if flag is 0 then it works exactly like read();
 		if(receivedHandshake(s))
 		{
-			uint16_t numberOfUsers;
-			recv(s, &numberOfUsers, sizeof(numberOfUsers),0);
-			printf("Number of Users:  %d\n", ntohs(numberOfUsers));
+			recv(s, &numberOfUsers, sizeof(numberOfUsers), 0);
+			// populateUserList(s, users, numberOfUsers);
+			// uint16_t numberOfUsers;
+			// recv(s, &numberOfUsers, sizeof(numberOfUsers),0);
+			// printf("Number of Users:  %d\n", ntohs(numberOfUsers));
 			// getCurrentUserList(s, users, numberOfUsers);
 			
 			int len = (int)strlen(username);
 			send(s, &len, sizeof(len), 0); // send username length
 			send(s, username, sizeof(username), 0);
-			printf("Name: %s\n", username);
-
+			// printf("Name: %s\n", username);
 
 			pid_t forkID = fork();
 			while(1)
@@ -225,13 +243,16 @@ int main(int argc, char** argv)
 				}
 				else // child process wants to always listen to the incoming messages
 				{
-					int messageFlag;
-					if(recv(s, &messageFlag, sizeof(messageFlag, 0), 0) > 0) // received the flag
-						receiveMessage(s, messageFlag);
+					uint8_t messageFlag;
+					if(recv(s, &messageFlag, sizeof(messageFlag), 0) > 0) // received the flag
+					{	
+						receiveMessage(s, messageFlag, users, &numberOfUsers);
+					}
 				}
 			}
 		}
 
+		sleep(1);
 		close(s);
 	}
 
