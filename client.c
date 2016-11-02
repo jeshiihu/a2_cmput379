@@ -91,7 +91,6 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 	{
 		printf("User %s: joined the server!\n", name);
 		addUserName(users, numberOfUsers, name, userLen +1);
-		// printCurrentUserList();
 	}
 	else if(flag == leave)
 		printf("User %s: disconnected from server.\n", name);
@@ -106,8 +105,6 @@ void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, i
 	users[index].length = len;
 	users[index].name = malloc(len * sizeof(char));
 	strcpy(users[index].name, name);
-
-	printCurrentUserList(users, *numberOfUsers);
 }
 
 
@@ -124,16 +121,12 @@ void populateUserList(int s, struct username * users, uint16_t numberOfUsers)
 		while(1) 
 		{ 
 			bytes = recv(s, &len, sizeof(len), 0);
-			printf("%d bytes --> %d len\n", bytes, len);
 			if(bytes == 1) 
 				break;
 		}
-		printf("%d bytes for user len: %d\n", bytes, len);
 
 		users[i].length = len;
 	}
-
-	// done populateUserLis
 }
 
 void printCurrentUserList(struct username * users, uint16_t numberOfUsers)
@@ -145,6 +138,10 @@ void printCurrentUserList(struct username * users, uint16_t numberOfUsers)
 		printf("users[%d] = %s\n", i, users[i].name);
 }
 
+void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
+{
+	printf("Number of current users: %d\n", numberOfUsers);
+}
 
 
 int main(int argc, char** argv)
@@ -204,11 +201,8 @@ int main(int argc, char** argv)
 		if(receivedHandshake(s))
 		{
 			recv(s, &numberOfUsers, sizeof(numberOfUsers), 0);
-			// populateUserList(s, users, numberOfUsers);
-			// uint16_t numberOfUsers;
-			// recv(s, &numberOfUsers, sizeof(numberOfUsers),0);
-			// printf("Number of Users:  %d\n", ntohs(numberOfUsers));
-			// getCurrentUserList(s, users, numberOfUsers);
+			numberOfUsers = ntohs(numberOfUsers);
+			recvAllCurrentUsers(s, numberOfUsers);
 			
 			int len = (int)strlen(username);
 			send(s, &len, sizeof(len), 0); // send username length
