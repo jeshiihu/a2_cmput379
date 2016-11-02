@@ -179,7 +179,7 @@ void sendUsernameAndLength(int fd, struct username * users, uint16_t numberOfUse
 	for(k = 0; k < usernameLength; k++)
 	{
 		int byteSent = send(fd, &username[k], sizeof(username[k]), 0);
-		printf("sending character: %c to fd: %d\n", username[k], fd);
+		// printf("sending character: %c to fd: %d\n", username[k], fd);
 		// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
 	}
 }

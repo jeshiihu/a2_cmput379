@@ -99,16 +99,13 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 
 void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, int len)
 {
+	*numberOfUsers = *numberOfUsers + 1;
+	int index = (*numberOfUsers) - 1;
 	users = realloc(users, (*numberOfUsers) * sizeof(struct username));
 
-	users[*numberOfUsers].length = len;
-	printf("seg?\n");
-
-	users[*numberOfUsers].name = malloc(len * sizeof(char));
-	strcpy(users[*numberOfUsers].name, name);
-	printf("seg?\n");
-	
-	*numberOfUsers = *numberOfUsers + 1;
+	users[index].length = len;
+	users[index].name = malloc(len * sizeof(char));
+	strcpy(users[index].name, name);
 
 	printCurrentUserList(users, *numberOfUsers);
 }
