@@ -80,9 +80,30 @@ void sendNumberOfUsers(int listener, uint16_t numUsers)
 	printf("sending number of users...\n" );
 
 	uint16_t num = htons(numUsers);
-	int bytes;
-	bytes = send (listener, &num, sizeof(num), 0);
-	printf("bytes sent: %d\n", bytes);
+	int bytes = send (listener, &num, sizeof(num), 0);
+	printf("%d bytes sent: number of users is %d\n", bytes, numUsers);
+}
+
+void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUsers)
+{
+	int i;
+	for(i = 0; i < numberOfUsers; i++)
+	{
+		uint8_t len;
+		int bytes;
+		while(1)
+		{
+			len = users[i].length;
+			bytes = send(listener, &len, sizeof(len), 0);
+			if(bytes == 1)
+				break;
+		} 
+
+		printf("%d bytes sent, len of user: %d\n", bytes, users[i].length);
+
+		// bytes = send(listener, users[i].name, sizeof(users[i].name), 0);
+		// printf("%d bytes sent, : %s\n", bytes, users[i].name);
+	}
 }
 
 int getUsernameLength(int listener)
@@ -268,6 +289,7 @@ int main(void)
 					
 					sendInitialHandshake(newfd);
 					sendNumberOfUsers(newfd, numberOfUsers);
+					sendAllUserNames(newfd, users, numberOfUsers);
 
 					int usernameLen = getUsernameLength(newfd);
 					char username[usernameLen + 1]; // required for adding a null terminator
@@ -277,7 +299,7 @@ int main(void)
 
 					if(isUniqueUsername(users, numberOfUsers, username))
 					{
-						sendUpdateToAllUsers(users, numberOfUsers, 1);
+						sendUpdateToAllUsers(users, numberOfUsers, 0x01);
 						numberOfUsers = numberOfUsers + 1;
 						users = realloc(users, numberOfUsers * sizeof(user));
 
@@ -306,6 +328,7 @@ int main(void)
 					char buf[256]; // data for client buffer, their messages
 					int nbytes;
 					int messageLength;
+
 					if((nbytes = recv(i, &messageLength, sizeof(messageLength), 0)) <= 0)
 					{
 						if(nbytes == 0) // got error or connection closed by client
@@ -326,7 +349,7 @@ int main(void)
 
 						numberOfUsers = numberOfUsers -1;
 
-						sendUpdateToAllUsers(users, numberOfUsers, 2);
+						sendUpdateToAllUsers(users, numberOfUsers, 0x02);
 
 						printf("after deleteUser\n");
 
@@ -391,6 +414,8 @@ int main(void)
 				} // ending if/else to handle data from the client
 			} // ending if got a new incoming connection
 		} // ending for loop, going through all file descriptors
+
+		sleep(1);
 	}  // ending while loop
 
 	return 0;

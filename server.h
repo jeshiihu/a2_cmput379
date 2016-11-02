@@ -29,6 +29,7 @@ struct username* deleteUser(struct username * users, uint16_t size, int fd);
 
 void sendInitialHandshake(int sock);
 void sendNumberOfUsers(int sock, uint16_t numUsers);
+void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUsers);
 
 int getUsernameLength(int sock);
 uint16_t getMessageLength(int sock);
