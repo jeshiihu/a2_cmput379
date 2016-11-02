@@ -101,8 +101,9 @@ void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUse
 
 		printf("%d bytes sent, len of user: %d\n", bytes, users[i].length);
 
-		// bytes = send(listener, users[i].name, sizeof(users[i].name), 0);
-		// printf("%d bytes sent, : %s\n", bytes, users[i].name);
+		int expectedBytes = sizeof(users[i].name);
+		bytes = send(listener, users[i].name, sizeof(users[i].name), 0);
+		printf("Expected %d bytes, %d bytes sent, : %s\n", expectedBytes, bytes, users[i].name);
 	}
 }
 
