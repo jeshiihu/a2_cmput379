@@ -17,7 +17,7 @@ void printUsers(struct username * users, uint16_t numberOfUsers)
 		printf("users[%d] = %s\n", i, users[i].name);
 }
 
-void addUserName(struct username * users, uint16_t numberOfUsers, char* name, int nameLen, int fd)
+void addUserName(struct username * users, uint16_t numberOfUsers, char* name, uint8_t nameLen, int fd)
 {
 	users[numberOfUsers - 1].length = nameLen;
 	users[numberOfUsers - 1].fd = fd;
@@ -158,20 +158,24 @@ void sendUsernameAndLength(int fd, struct username * users, uint16_t numberOfUse
 	for(k = 0; k < usernameLength; k++)
 	{
 		int byteSent = send(fd, &username[k], sizeof(username[k]), 0);
+		printf("sending character: %c to fd: %d\n", username[k], fd);
 		// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
 	}
 }
 
-void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, uint8_t flag)
+void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char* name, uint8_t nameLen,  uint8_t flag)
 {
 	printf("in send leave update\n");
+
+	uint8_t usernameLength = nameLen;
+	char username[usernameLength];
+	strcpy(username, name);
+
 	int index;
 	for(index = 0; index < numberOfUsers; index++) 
 	{
 		int fd = users[index].fd;
-		uint8_t usernameLength = users[index].length;
-		char username[usernameLength];
-		strcpy(username, users[index].name);
+
 		if (flag == ((uint8_t)0x02))
 		{
 			// int flag = htonl(0x02); // send leave message flag
@@ -277,12 +281,14 @@ int main(void)
 
 					if(isUniqueUsername(users, numberOfUsers, username))
 					{
-						sendUpdateToAllUsers(users, numberOfUsers, 1);
 						numberOfUsers = numberOfUsers + 1;
 						users = realloc(users, numberOfUsers * sizeof(user));
 
 						printf("Adding user: %s\n", username);
 						addUserName(users, numberOfUsers, username, usernameLen, newfd); //Calvin: changed i tp newfd
+
+						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 1);
+
 
 						printUsers(users, numberOfUsers);
 						printf("\n");
@@ -321,12 +327,16 @@ int main(void)
 						int index = getUserIndex(users, numberOfUsers, i);
 						// sendMessageToAllUsers(users, numberOfUsers, users[index].length, users[index].name);
 
+						uint8_t usernameLen = users[index].length;
+						char username[usernameLen];
+						strcpy(username, users[index].name);
+
 						users = deleteUser(users, numberOfUsers, i); //delete user that disconnected
 
 
 						numberOfUsers = numberOfUsers -1;
 
-						sendUpdateToAllUsers(users, numberOfUsers, 2);
+						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 2);
 
 						printf("after deleteUser\n");
 
