@@ -27,6 +27,7 @@ char *inputMessage(FILE* fp, size_t size)
 	return realloc(str, sizeof(*str)*len);
 }
 
+
 void getStringFromRecv(int s, char * str, int len)
 {
 	int currentBytesRead = 0;
@@ -47,33 +48,41 @@ void getStringFromRecv(int s, char * str, int len)
 void receiveMessage(int s, int flag) // expecting length string (msglen msg is flag is 0x00)
 {
 	uint16_t userLen;
-	if (recv(s, &userLen, sizeof(userLen), 0) > 0) // get the first length
+	int bytes;
+	if ((bytes = recv(s, &userLen, sizeof(userLen), 0)) < 0) // get the first length
 	{
-		userLen = ntohs(userLen);
-		char name[userLen + 1];
-		getStringFromRecv(s, name, userLen);
-		printf("User %s ", name);
+		printf("Error in reading from Server\n");
+		return;
 	}
 
-	if(flag == 0x00) // regular message
+	userLen = ntohs(userLen);
+	char name[userLen + 1];
+	getStringFromRecv(s, name, userLen);
+
+	if(flag == 0) // regular message
 	{
 		uint16_t msgLenth;
-		if (recv(s, &msgLenth, sizeof(msgLenth), 0) > 0)
+		if((bytes = recv(s, &msgLenth, sizeof(msgLenth), 0)) > 0)
 		{
 			int msgLenth = ntohs(msgLenth);
 			char msg[msgLenth + 1];
 			getStringFromRecv(s, msg, msgLenth);
-			printf(": %s:\n", msg);
+			printf("User %s: %s\n", name, msg);
 		}
 	}
-	else if(flag == 0x01)
-		printf("joined the server!\n");
-	else if(flag == 0x02)
-		printf("disconnected from server.\n");
+	else if(flag == 1)
+	{
+		printf("User %s: joined the server!\n", name);
+	}
+	else if(flag == 2)
+		printf("User %s: disconnected from server.\n", name);
 }
 
 int main(int argc, char** argv)
-{
+{	
+	struct username user;
+	struct username * users;
+
 	if(argc != 5)
 	{
 		printf("Invalid client input. Should be formatted as: chatname hostname portnumber username\n");
@@ -129,26 +138,25 @@ int main(int argc, char** argv)
 		fprintf (stderr, "Process: %d, first byte: %x\n", getpid (), ntohl (firstByte));
 		
 		recv(s, &secondByte, sizeof(secondByte),0);
-		fprintf(stderr, "Process: %d, gets number: %x\n", getpid (), ntohl(secondByte));
+		printf("Process: %d, gets number: %x\n", getpid (), ntohl(secondByte));
 
 		if(ntohl(firstByte) == 0xcf && ntohl(secondByte) == 0xa7)
 		{
-			fprintf(stderr, "confirm\n");
+			printf("confirm\n");
 			int numberOfUsers;
 			recv(s, &numberOfUsers, sizeof(secondByte),0);
-			fprintf(stderr, "Number of Users:  %d\n", ntohs(numberOfUsers));
+			printf("Number of Users:  %d\n", ntohs(numberOfUsers));
 			
 			int len = (int)strlen(username);
 			send(s, &len, sizeof(len), 0); // send username length
 			send(s, username, sizeof(username), 0);
-			fprintf(stderr, "Name: %s\n", username);
+			printf("Name: %s\n", username);
 
-			// int keepAliveTime = 3000;
-			// clock_t before = clock()*1000/CLOCKS_PER_SEC;
+			// getCurrentUserList(s, users, numberOfUsers);
+
 			pid_t forkID = fork();
 			while(1)
 			{
-				// printf("while\n");
 				char *message;
 				uint16_t messageLength;
 				
@@ -160,7 +168,7 @@ int main(int argc, char** argv)
 
 						int messageLengthInNBO = htons(messageLength);
 						send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
-
+						
 						char sentMessage[messageLength];
 						strcpy(sentMessage, message);
 
@@ -175,23 +183,15 @@ int main(int argc, char** argv)
 					if(recv(s, &messageFlag, sizeof(messageFlag, 0), 0) > 0) // received the flag
 						receiveMessage(s, messageFlag);
 				}
-				//char inputMessage[250];
-				//scanf("%s", inputMessage);
-				//printf("after scanf\n");
-				//char message[strlen(inputMessage)];
-				//printf("message length: %d\n", strlen(inputMessage));
-				//strcpy(message, inputMessage);
-				//printf("after copy\n");
-				//printf("%s\n,", message);
 
 				// int current = clock()*1000/CLOCKS_PER_SEC;
 				// if((current - before) >= keepAliveTime)
 				// {
-				// 	fprintf(stderr, "Clock: %d, Before: %d\n", current, before);
+				// 	printf("Clock: %d, Before: %d\n", current, before);
 				// 	int keepAliveLen = htonl (0);
 				// 	if(send (s, &keepAliveLen, sizeof(keepAliveLen), 0) == -1)
 				// 	{	
-				// 		fprintf(stderr, "Connection closed.\n");
+				// 		printf("Connection closed.\n");
 				// 		close(s);
 				// 	}
 
@@ -201,7 +201,6 @@ int main(int argc, char** argv)
 		}
 
 		// keep alive
-		sleep(5);
 		close(s);
 	}
 
