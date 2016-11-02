@@ -23,13 +23,13 @@ struct username
 	int fd;
 };
 
-void printUsers(struct username * users, int numberOfUsers);
-void addUserName(struct username * users, int size, char* name, int nameLen, int fd);
-struct username* deleteUser(struct username * users, int size, int fd);
+void printUsers(struct username * users, uint16_t numberOfUsers);
+void addUserName(struct username * users, uint16_t size, char* name, int nameLen, int fd);
+struct username* deleteUser(struct username * users, uint16_t size, int fd);
 
 void sendInitialHandshake(int sock);
-void sendNumberOfUsers(int sock, int numUsers);
+void sendNumberOfUsers(int sock, uint16_t numUsers);
 
 int getUsernameLength(int sock);
 uint16_t getMessageLength(int sock);
-bool isUniqueUsername(struct username * users, int size, char* newUser);
+bool isUniqueUsername(struct username * users, uint16_t size, char* newUser);

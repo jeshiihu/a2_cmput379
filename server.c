@@ -8,7 +8,7 @@
  distinct numbers. The server and the clients may run on different ma-
  chines.
  --------------------------------------------------------------------- */
-void printUsers(struct username * users, int numberOfUsers)
+void printUsers(struct username * users, uint16_t numberOfUsers)
 {
 	printf("Number of users: %d\n", numberOfUsers);
 	
@@ -17,19 +17,19 @@ void printUsers(struct username * users, int numberOfUsers)
 		printf("users[%d] = %s\n", i, users[i].name);
 }
 
-void addUserName(struct username * users, int size, char* name, int nameLen, int fd)
+void addUserName(struct username * users, uint16_t numberOfUsers, char* name, int nameLen, int fd)
 {
-	users[size - 1].length = nameLen;
-	users[size - 1].fd = fd;
+	users[numberOfUsers - 1].length = nameLen;
+	users[numberOfUsers - 1].fd = fd;
 
-	users[size - 1].name = malloc(nameLen * sizeof(char));
-	strcpy(users[size - 1].name, name);
+	users[numberOfUsers - 1].name = malloc(nameLen * sizeof(char));
+	strcpy(users[numberOfUsers - 1].name, name);
 }
 
-int getUserIndex(struct username * users, int size, int fd)
+int getUserIndex(struct username * users, uint16_t numberOfUsers, int fd)
 {
 	int index;
- 	for(index = 0; index < size; index++)
+ 	for(index = 0; index < numberOfUsers; index++)
 	{
 	 	//printf("comparing fd to be checked %d to passed fd %d \n",users[index].fd,fd );
 	 	if(users[index].fd == fd) // found the user
@@ -39,26 +39,26 @@ int getUserIndex(struct username * users, int size, int fd)
 	return index;
 }
 
-struct username* deleteUser(struct username * users, int size, int fd) //deletes users in an ugly fashion of shifting other elements up and freeing space
+struct username* deleteUser(struct username * users, uint16_t numberOfUsers, int fd) //deletes users in an ugly fashion of shifting other elements up and freeing space
 {
 	printf("in deleteUser\n");
-	int index = getUserIndex(users, size, fd);
+	int index = getUserIndex(users, numberOfUsers, fd);
 
 	struct username user; // used to get size
-	struct username* tempUsers = malloc((size - 1) * sizeof(user)); //create array of size one less than it was
+	struct username* tempUsers = malloc((numberOfUsers - 1) * sizeof(user)); //create array of size one less than it was
 
 	if(index == 0)	// want to remove the first element, so copy every thing before this element
 	{
-		memcpy(tempUsers, users+1, (size - 1) * sizeof(user));
+		memcpy(tempUsers, users+1, (numberOfUsers - 1) * sizeof(user));
 	}
-	else if(index == (size-1)) // want to remove the last element so copy everything until the last
+	else if(index == (numberOfUsers-1)) // want to remove the last element so copy everything until the last
 	{
-		memcpy(tempUsers, users, (size - 1) * sizeof(user));
+		memcpy(tempUsers, users, (numberOfUsers - 1) * sizeof(user));
 	}
 	else // want to remove an element in between, copy before and then copy after
 	{
 		memcpy(tempUsers, users, (index) * sizeof(user));
-		memcpy(tempUsers+index, users+index+1, (size-index-1) * sizeof(user));
+		memcpy(tempUsers+index, users+index+1, (numberOfUsers-index-1) * sizeof(user));
 	}
 
 	free(users);
@@ -68,21 +68,21 @@ struct username* deleteUser(struct username * users, int size, int fd) //deletes
 
 void sendInitialHandshake(int listener)
 {
-	printf("sending handshake...\n" );
-
-	int outnum = htonl(0xCF);
-	send (listener, &outnum, sizeof (outnum), 0);
-	
-	outnum = htonl (0xA7);
-	send (listener, &outnum, sizeof (outnum), 0);
+	uint8_t * handshakeArray = malloc(2 * sizeof(uint8_t));
+	handshakeArray[0] = 0xcf;
+	handshakeArray[1] = 0xaf;
+	int bytesSentFirst;
+	bytesSentFirst = send(listener, handshakeArray, 2 * sizeof(uint8_t), 0);
 }
 
-void sendNumberOfUsers(int listener, int numUsers)
+void sendNumberOfUsers(int listener, uint16_t numUsers)
 {
 	printf("sending number of users...\n" );
 
-	int num = htons(numUsers);
-	send (listener, &num, sizeof(num), 0);
+	uint16_t num = htons(numUsers);
+	int bytes;
+	bytes = send (listener, &num, sizeof(num), 0);
+	printf("bytes sent: %d\n", bytes);
 }
 
 int getUsernameLength(int listener)
@@ -101,10 +101,10 @@ uint16_t getMessageLength(int listener)
 	return i;
 }
 
-bool isUniqueUsername(struct username * users, int size, char* newUser)
+bool isUniqueUsername(struct username * users, uint16_t numberOfUsers, char* newUser)
 {
 	int i;
-	for (i = 0; i < size; i++) 
+	for (i = 0; i < numberOfUsers; i++) 
 	{
 		if (strcmp(users[i].name, newUser) == 0) // two names match so invalid username since not unqiue
 			return false;
@@ -124,17 +124,17 @@ int getListener()
 	return listener;
 }
 
-void sendMessageToAllUsers(struct username * users, int numberOfUsers, int messageLength, char * message)
+void sendMessageToAllUsers(struct username * users, uint16_t numberOfUsers, int messageLength, char * message)
 {
 	int index;
 	for(index = 0; index < numberOfUsers; index++) 
 	{
 		int fd = users[index].fd;
 
-		int flag = htonl(0x00); // send regular message flag
+		uint8_t flag = 0x00; // send regular message flag
 		send(fd, &flag, sizeof(flag), 0);
 
-		int messageLengthInNBO = htons(messageLength);
+		uint16_t messageLengthInNBO = htons(messageLength);
 		int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
 		// printf("send byte: %d\n",sendByte);
 		int k;
@@ -149,9 +149,9 @@ void sendMessageToAllUsers(struct username * users, int numberOfUsers, int messa
 	}
 }
 
-void sendUsernameAndLength(int fd, struct username * users, int numberOfUsers, char * username, int usernameLength)
+void sendUsernameAndLength(int fd, struct username * users, uint16_t numberOfUsers, char * username, uint8_t usernameLength)
 {
-	int usernameLengthInNBO = htons(usernameLength);
+	uint8_t usernameLengthInNBO = usernameLength;
 	int sendByte = send(fd, &usernameLengthInNBO, sizeof(usernameLengthInNBO), 0);
 	// printf("send byte: %d\n",sendByte);
 	int k;
@@ -162,7 +162,7 @@ void sendUsernameAndLength(int fd, struct username * users, int numberOfUsers, c
 	}
 }
 
-void sendUpdateToAllUsers(struct username * users, int numberOfUsers, int flag)
+void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, uint8_t flag)
 {
 	printf("in send leave update\n");
 	int index;
@@ -172,15 +172,16 @@ void sendUpdateToAllUsers(struct username * users, int numberOfUsers, int flag)
 		uint8_t usernameLength = users[index].length;
 		char username[usernameLength];
 		strcpy(username, users[index].name);
-		if (flag == 2)
+		if (flag == ((uint8_t)0x02))
 		{
-			int flag = htonl(0x02); // send leave message flag
-			printf("sending leave flag: %d\n", flag);
+			// int flag = htonl(0x02); // send leave message flag
+			printf("sending leave flag: %x\n", flag);
 		}
-		else if (flag == 1){
-			int flag = htonl(0x01);
-			printf("sending join flag: %d\n", flag);
+		else if (flag == ((uint8_t)0x01)){
+			// int flag = htonl(0x01);
+			printf("sending join flag: %x\n", flag);
 		}
+		
 		send(fd, &flag, sizeof(flag), 0);
 		printf("sent flag\n");
 
@@ -201,7 +202,7 @@ int main(void)
 	// int i, j,rv;
 	struct username user; // used to get size
 	struct username * users = malloc(1 * sizeof(user));
-	int numberOfUsers = 0;
+	uint16_t numberOfUsers = 0;
 
 	int listener = getListener();
 
@@ -272,7 +273,7 @@ int main(void)
 					char username[usernameLen + 1]; // required for adding a null terminator
 					recv(newfd, &username, usernameLen, 0);
 					username[usernameLen] = '\0';
-					printf("Client username: %s\n",username);
+					printf("Client username: %s\n", username);
 
 					if(isUniqueUsername(users, numberOfUsers, username))
 					{

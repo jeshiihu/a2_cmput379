@@ -29,19 +29,19 @@ char *inputMessage(FILE* fp, size_t size)
 
 bool receivedHandshake(int s)
 {
-	int firstByte, secondByte;
-	recv(s, &firstByte, sizeof (firstByte),0);
-	// fprintf (stderr, "Process: %d, first byte: %x\n", getpid (), ntohl (firstByte));
-	
-	recv(s, &secondByte, sizeof(secondByte),0);
-	// printf("Process: %d, gets number: %x\n", getpid (), ntohl(secondByte));
-	if(ntohl(firstByte) == 0xcf && ntohl(secondByte) == 0xa7)
+	uint8_t * handshakeBuf = malloc(2 * sizeof(uint8_t));
+	int bytes;
+	bytes = recv(s, handshakeBuf, 2* sizeof(uint8_t),0);
+
+	uint8_t first = 0xcf;
+	uint8_t second = 0xaf;
+	if(handshakeBuf[0] == first && handshakeBuf[1] == second)
 		return true;
 
 	return false;
 }
 
-void getStringFromRecv(int s, char * str, int len)
+void getStringFromRecv(int s, char * str, uint8_t len)
 {
 	int currentBytesRead = 0;
 	while(currentBytesRead < len)
@@ -66,9 +66,9 @@ void getStringFromRecv(int s, char * str, int len)
 // 	strcpy(users[numberOfUsers - 1].name, name);
 // }
 
-void receiveMessage(int s, int flag) // expecting length string (msglen msg is flag is 0x00)
+void receiveMessage(int s, uint8_t flag) // expecting length string (msglen msg is flag is 0x00)
 {
-	uint16_t userLen;
+	uint8_t userLen;
 	int bytes;
 	if ((bytes = recv(s, &userLen, sizeof(userLen), 0)) < 0) // get the first length
 	{
@@ -76,21 +76,21 @@ void receiveMessage(int s, int flag) // expecting length string (msglen msg is f
 		return;
 	}
 
-	userLen = ntohs(userLen);
+	// userLen = ntohs(userLen);
 	char name[userLen + 1];
 	getStringFromRecv(s, name, userLen);
 
-	if(ntohl(flag) == 0x00) // regular message
-	{
-		userLen = ntohs(userLen);
-		char name[userLen + 1];
-		getStringFromRecv(s, name, userLen);
-		printf("User %s of length: %d \n", name, userLen);
-	}
+	// if(flag == ((uint8_t)0x00)) // regular message
+	// {
+	// 	userLen = ntohs(userLen);
+	// 	char name[userLen + 1];
+	// 	getStringFromRecv(s, name, userLen);
+	// 	printf("User %s of length: %d \n", name, userLen);
+	// }
 
 	printf("the flag is: %d \n", flag);
 
-	if(flag == 0x00) // regular message
+	if(flag == ((uint8_t)0x00)) // regular message
 	{
 		uint16_t msgLenth;
 		if((bytes = recv(s, &msgLenth, sizeof(msgLenth), 0)) > 0)
@@ -101,13 +101,13 @@ void receiveMessage(int s, int flag) // expecting length string (msglen msg is f
 			printf("User %s: %s\n", name, msg);
 		}
 	}
-	else if(ntohl(flag) == 0x01)
+	else if(flag == ((uint8_t)0x01))
 	{
 		printf("User %s: joined the server!\n", name);
 		// addUserName(name, userLen +1);
 		// printCurrentUserList();
 	}
-	else if(ntohl(flag) == 0x02)
+	else if(flag == ((uint8_t)0x02))
 		printf("User %s: disconnected from server.\n", name);
 }
 
@@ -189,7 +189,7 @@ int main(int argc, char** argv)
 		// if flag is 0 then it works exactly like read();
 		if(receivedHandshake(s))
 		{
-			int numberOfUsers;
+			uint16_t numberOfUsers;
 			recv(s, &numberOfUsers, sizeof(numberOfUsers),0);
 			printf("Number of Users:  %d\n", ntohs(numberOfUsers));
 			// getCurrentUserList(s, users, numberOfUsers);
