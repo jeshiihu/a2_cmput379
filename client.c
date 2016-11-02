@@ -60,17 +60,16 @@ void getStringFromRecv(int s, char * str, uint8_t len)
 
 void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numberOfUsers) // expecting length string (msglen msg is flag is 0x00)
 {
-	printf("Incoming message, Flag is received: %x \n", flag);
 	uint8_t msg = 0x00;
 	uint8_t join = 0x01;
 	uint8_t leave = 0x02;
 
 	uint8_t userLen;
-	int bytes;
-	if ((bytes = recv(s, &userLen, sizeof(userLen), 0)) < 0) // get the first length
-	{
-		printf("Error in reading from Server\n");
-		return;
+	while(1)
+	{	
+		int bytes = recv(s, &userLen, sizeof(userLen), 0);
+		if(bytes == 1 && userLen > 0)
+			break;
 	}
 
 	char name[userLen + 1];
@@ -78,8 +77,11 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 
 	if(flag == msg) // regular message
 	{
+		return;
 		uint16_t msgLenth;
-		if((bytes = recv(s, &msgLenth, sizeof(msgLenth), 0)) > 0)
+		int bytes = recv(s, &msgLenth, sizeof(msgLenth), 0);
+
+		if(bytes == 1 && msgLenth > 0)
 		{
 			uint16_t msgLenth = ntohs(msgLenth);
 			char msg[msgLenth + 1];
@@ -197,12 +199,10 @@ int main(int argc, char** argv)
 			recv(s, &numberOfUsers, sizeof(numberOfUsers), 0);
 			numberOfUsers = ntohs(numberOfUsers);
 			receiveSentUserNames(s, numberOfUsers);
-			// printCurrentUserList(users, numberOfUsers);
 			
 			int len = (int)strlen(username);
 			send(s, &len, sizeof(len), 0); // send username length
 			send(s, username, sizeof(username), 0);
-			// printf("Name: %s\n", username);
 
 			pid_t forkID = fork();
 			while(1)
@@ -230,9 +230,15 @@ int main(int argc, char** argv)
 				else // child process wants to always listen to the incoming messages
 				{
 					uint8_t messageFlag;
-					if(recv(s, &messageFlag, sizeof(messageFlag), 0) > 0) // received the flag
+					int bytes;
+					while(1)
 					{	
-						receiveMessage(s, messageFlag, users, &numberOfUsers);
+						bytes = recv(s, &messageFlag, sizeof(messageFlag), 0);
+						if(bytes == 1)
+						{
+							printf("Incoming message: %x\n", messageFlag);
+							receiveMessage(s, messageFlag, users, &numberOfUsers);
+						}
 					}
 				}
 			}
