@@ -141,6 +141,20 @@ void printCurrentUserList(struct username * users, uint16_t numberOfUsers)
 void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
 {
 	printf("Number of current users: %d\n", numberOfUsers);
+
+	int i;
+	for(i = 0; i < numberOfUsers; i++)
+	{
+		uint8_t len;
+		while(1)
+		{
+			int bytes = recv(s, &len, sizeof(len), 0);
+			if(bytes == 1 && len > 0)
+				break;
+		}
+
+		printf("UsernameLength: %d\n", len);
+	}
 }
 
 
