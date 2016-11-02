@@ -81,11 +81,12 @@ void sendNumberOfUsers(int listener, uint16_t numUsers)
 
 	uint16_t num = htons(numUsers);
 	int bytes = send (listener, &num, sizeof(num), 0);
-	printf("%d bytes sent: number of users is %d\n", bytes, numUsers);
+	// printf("%d bytes sent: number of users is %d\n", bytes, numUsers);
 }
 
 void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUsers)
 {
+	printf("sending usernames to newly joined client: (there are %d users)\n", numberOfUsers);
 	int i;
 	for(i = 0; i < numberOfUsers; i++)
 	{
@@ -101,8 +102,8 @@ void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUse
 
 		printf("%d bytes sent, len of user: %d\n", bytes, users[i].length);
 
-		// bytes = send(listener, users[i].name, sizeof(users[i].name), 0);
-		// printf("%d bytes sent, : %s\n", bytes, users[i].name);
+		bytes = send(listener, users[i].name, sizeof(users[i].name), 0);
+		printf("%d bytes sent, : %s\n", bytes, users[i].name);
 	}
 }
 

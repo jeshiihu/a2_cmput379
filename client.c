@@ -60,7 +60,7 @@ void getStringFromRecv(int s, char * str, uint8_t len)
 
 void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numberOfUsers) // expecting length string (msglen msg is flag is 0x00)
 {
-	printf("the flag is: %x \n", flag);
+	// printf("the flag is: %x \n", flag);
 	uint8_t msg = 0x00;
 	uint8_t join = 0x01;
 	uint8_t leave = 0x02;
@@ -106,34 +106,27 @@ void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, i
 	users[index].length = len;
 	users[index].name = malloc(len * sizeof(char));
 	strcpy(users[index].name, name);
-
-	printCurrentUserList(users, *numberOfUsers);
 }
 
-
-void populateUserList(int s, struct username * users, uint16_t numberOfUsers)
+void receiveSentUserNames(int s, uint16_t numberOfUsers)
 {
-	printf("Number of Users:  %d\n", ntohs(numberOfUsers));
-	users = realloc(users, numberOfUsers * sizeof(struct username));
-
+	printf("Number Of Users: %d\n", numberOfUsers);
 	int i;
 	for(i = 0; i < numberOfUsers; i++)
 	{
 		uint8_t len;
 		int bytes;
-		while(1) 
-		{ 
+		while(1) // get the username length
+		{
 			bytes = recv(s, &len, sizeof(len), 0);
-			printf("%d bytes --> %d len\n", bytes, len);
-			if(bytes == 1) 
+			if(bytes == 1 && len > 0)
 				break;
 		}
-		printf("%d bytes for user len: %d\n", bytes, len);
 
-		users[i].length = len;
+		char name[len + 1];
+		getStringFromRecv(s, name, len);
+		printf("user[%d]: %s\n", i, name);
 	}
-
-	// done populateUserLis
 }
 
 void printCurrentUserList(struct username * users, uint16_t numberOfUsers)
@@ -144,8 +137,6 @@ void printCurrentUserList(struct username * users, uint16_t numberOfUsers)
 	for(i = 0; i < numberOfUsers; i++)
 		printf("users[%d] = %s\n", i, users[i].name);
 }
-
-
 
 int main(int argc, char** argv)
 {	
@@ -204,11 +195,9 @@ int main(int argc, char** argv)
 		if(receivedHandshake(s))
 		{
 			recv(s, &numberOfUsers, sizeof(numberOfUsers), 0);
-			// populateUserList(s, users, numberOfUsers);
-			// uint16_t numberOfUsers;
-			// recv(s, &numberOfUsers, sizeof(numberOfUsers),0);
-			// printf("Number of Users:  %d\n", ntohs(numberOfUsers));
-			// getCurrentUserList(s, users, numberOfUsers);
+			numberOfUsers = ntohs(numberOfUsers);
+			receiveSentUserNames(s, numberOfUsers);
+			// printCurrentUserList(users, numberOfUsers);
 			
 			int len = (int)strlen(username);
 			send(s, &len, sizeof(len), 0); // send username length
