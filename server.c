@@ -31,7 +31,6 @@ int getUserIndex(struct username * users, uint16_t numberOfUsers, int fd)
 	int index;
  	for(index = 0; index < numberOfUsers; index++)
 	{
-	 	//printf("comparing fd to be checked %d to passed fd %d \n",users[index].fd,fd );
 	 	if(users[index].fd == fd) // found the user
 	 		break;
 	}
@@ -41,7 +40,6 @@ int getUserIndex(struct username * users, uint16_t numberOfUsers, int fd)
 
 struct username* deleteUser(struct username * users, uint16_t numberOfUsers, int fd) //deletes users in an ugly fashion of shifting other elements up and freeing space
 {
-	printf("in deleteUser\n");
 	int index = getUserIndex(users, numberOfUsers, fd);
 
 	struct username user; // used to get size
@@ -77,11 +75,8 @@ void sendInitialHandshake(int listener)
 
 void sendNumberOfUsers(int listener, uint16_t numUsers)
 {
-	printf("sending number of users...\n" );
-
 	uint16_t num = htons(numUsers);
 	int bytes = send (listener, &num, sizeof(num), 0);
-	printf("%d bytes sent: number of users is %d\n", bytes, numUsers);
 }
 
 void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUsers)
@@ -98,7 +93,6 @@ void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUse
 			if(bytes == 1)
 				break;
 		} 
-
 		printf("%d bytes sent, len of user: %d\n", bytes, users[i].length);
 
 		int expectedBytes = sizeof(users[i].name);
@@ -154,41 +148,45 @@ void sendMessageToAllUsers(struct username * users, uint16_t numberOfUsers, int 
 		int fd = users[index].fd;
 
 		uint8_t flag = 0x00; // send regular message flag
-		send(fd, &flag, sizeof(flag), 0);
+		int bytes;
+		while(1)
+		{
+			bytes = send(fd, &flag, sizeof(flag), 0);
+			if(bytes == 1)
+				break;
+		}
 
 		uint16_t messageLengthInNBO = htons(messageLength);
 		int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
-		// printf("send byte: %d\n",sendByte);
+		
 		int k;
 		for(k = 0; k < messageLength; k++)
 		{
 			int byteSent = send(fd, &message[k], sizeof(message[k]), 0);
-			// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
 		}
-
-		// send(fd, message, sizeof(message), 0);
-		printf("sent message: %s to fd: %d \n",message, fd);
 	}
 }
 
 void sendUsernameAndLength(int fd, struct username * users, uint16_t numberOfUsers, char * username, uint8_t usernameLength)
 {
 	uint8_t usernameLengthInNBO = usernameLength;
-	int sendByte = send(fd, &usernameLengthInNBO, sizeof(usernameLengthInNBO), 0);
-	// printf("send byte: %d\n",sendByte);
+	
+	while(1)
+	{
+		int sendByte = send(fd, &usernameLengthInNBO, sizeof(usernameLengthInNBO), 0);
+		if(sendByte == 1)
+			break;
+	}	
+
 	int k;
 	for(k = 0; k < usernameLength; k++)
 	{
 		int byteSent = send(fd, &username[k], sizeof(username[k]), 0);
-		// printf("sending character: %c to fd: %d\n", username[k], fd);
-		// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
 	}
 }
 
 void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char* name, uint8_t nameLen,  uint8_t flag)
 {
-	printf("in send leave update\n");
-
 	uint8_t usernameLength = nameLen;
 	char username[usernameLength];
 	strcpy(username, name);
@@ -197,24 +195,19 @@ void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char*
 	for(index = 0; index < numberOfUsers; index++) 
 	{
 		int fd = users[index].fd;
-
-		if (flag == ((uint8_t)0x02))
-		{
-			// int flag = htonl(0x02); // send leave message flag
-			printf("sending leave flag: %x\n", flag);
-		}
-		else if (flag == ((uint8_t)0x01)){
-			// int flag = htonl(0x01);
-			printf("sending join flag: %x\n", flag);
-		}
 		
-		send(fd, &flag, sizeof(flag), 0);
-		printf("sent flag\n");
+		int bytes;
+		while(1)
+		{
+			bytes = send(fd, &flag, sizeof(uint8_t), 0);
+			if(bytes == 1)
+			{
+				printf("Sending flag: %x\n", flag);
+				break;
+			}
+		}	
 
 		sendUsernameAndLength(fd, users, numberOfUsers, username, usernameLength);
-
-		// send(fd, message, sizeof(message), 0);
-		printf("sent user update: %s to fd: %d \n",username, fd);
 	}
 }
 
@@ -269,10 +262,8 @@ int main(void)
 
 	while (1) // -------------------------------------------------------- while loop --------------------------------------------------
 	{
-		//fprintf(stderr, "========= Starting while loop =========\n");
-
+		// fprintf(stderr, "========= Starting while loop =========\n");
 		read_fds = master; // copy it
-
 		if(select(fdmax+1, &read_fds, NULL, NULL, &timeout) == -1)
 		{
 			perror("Server: cannot select file descriptor");
@@ -305,16 +296,15 @@ int main(void)
 					char username[usernameLen + 1]; // required for adding a null terminator
 					recv(newfd, &username, usernameLen, 0);
 					username[usernameLen] = '\0';
-					printf("Client username: %s\n", username);
 
 					if(isUniqueUsername(users, numberOfUsers, username))
 					{
 						numberOfUsers = numberOfUsers + 1;
 						users = realloc(users, numberOfUsers * sizeof(user));
 
-						printf("Adding user: %s\n", username);
 						addUserName(users, numberOfUsers, username, usernameLen, newfd); //Calvin: changed i tp newfd
-						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 1);
+						uint8_t flag = 0x01;
+						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, flag);
 
 						printUsers(users, numberOfUsers);
 						printf("\n");
@@ -344,7 +334,6 @@ int main(void)
 						if(nbytes == 0) // got error or connection closed by client
 						{
 							printf("Selected Server: socket %d hung up\n", i);
-							
 						}
 						else
 						{
@@ -352,21 +341,14 @@ int main(void)
 						}
 
 						int index = getUserIndex(users, numberOfUsers, i);
-						// sendMessageToAllUsers(users, numberOfUsers, users[index].length, users[index].name);
-
 						uint8_t usernameLen = users[index].length;
 						char username[usernameLen];
 						strcpy(username, users[index].name);
 
 						users = deleteUser(users, numberOfUsers, i); //delete user that disconnected
-
-
 						numberOfUsers = numberOfUsers -1;
-
-						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 2);
-
-						printf("after deleteUser\n");
-
+						uint8_t flag = 0x02;
+						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, flag);
 
 						printUsers(users, numberOfUsers);
 						close(i);
@@ -376,60 +358,16 @@ int main(void)
 					{
 						// get message and send to everyone...
 						messageLength = ntohs(messageLength);
-						printf("message length: %d\n", messageLength);
 
 						char message[messageLength + 1]; // required for adding a null terminator
 						recv(i, &message, messageLength, 0);
 						message[messageLength] = '\0';
-						printf("message recieved: %s\n", message);
 
 						sendMessageToAllUsers(users, numberOfUsers, messageLength, message);
-
-						// int index;
-						// for(index = 0; index < numberOfUsers; index++) 
-						// {
-						// 	int fd = users[index].fd;
-
-						// 	int messageLengthInNBO = htons(messageLength);
-						// 	int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
-						// 	printf("send byte: %d\n",sendByte);
-						// 	int k;
-						// 	for(k = 0; k < messageLength; k++)
-						// 	{
-						// 		int byteSent = send(fd, &message[k], sizeof(message[k]), 0);
-						// 		printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
-						// 	}
-
-						// 	// send(fd, message, sizeof(message), 0);
-						// 	printf("sent message: %s to fd: %d \n",message, fd);
-						// }
 					}
-					// int keepAliveTime = 3000;
-					// clock_t before = clock()*1000/CLOCKS_PER_SEC;
-					// while(1)
-					// {
-					// 	int keepAlive;
-					// 	int current = clock()*1000/CLOCKS_PER_SEC;
-					// 	if((current - before) >= keepAliveTime)
-					// 	{
-					// 		if(recv(newfd, &keepAlive, sizeof(keepAlive), 0) == 0 ||
-					// 			recv(newfd, &keepAlive, sizeof(keepAlive), 0) == -1)
-					// 		{
-					// 			printf("Closing socket connection with client\n");
-					// 			close(newfd);
-					// 			break;
-					// 		}
-
-					// 		if(ntohl(keepAlive) == 0)
-					// 			printf("recieved keep alice\n");
-					// 		before = clock()*1000/CLOCKS_PER_SEC;
-					// 	}
-					// }
 				} // ending if/else to handle data from the client
 			} // ending if got a new incoming connection
 		} // ending for loop, going through all file descriptors
-
-		sleep(1);
 	}  // ending while loop
 
 	return 0;

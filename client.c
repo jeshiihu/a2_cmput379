@@ -55,22 +55,25 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 	uint8_t leave = 0x02;
 
 	uint8_t userLen;
-	int bytes;
-	if ((bytes = recv(s, &userLen, sizeof(userLen), 0)) < 0) // get the first length
-	{
-		printf("Error in reading from Server\n");
-		return;
+	while(1)
+	{	
+		int bytes = recv(s, &userLen, sizeof(userLen), 0);
+		if(bytes == 1 && userLen > 0)
+			break;
 	}
 
 	char name[userLen + 1];
-	bytes = recv(s, &name, sizeof(name), 0);
+	int bytes = recv(s, &name, sizeof(name), 0);
 	name[userLen] = '\0';
 	// getStringFromRecv(s, name, userLen);
 
 	if(flag == msg) // regular message
 	{
+		return;
 		uint16_t msgLenth;
-		if((bytes = recv(s, &msgLenth, sizeof(msgLenth), 0)) > 0)
+		int bytes = recv(s, &msgLenth, sizeof(msgLenth), 0);
+
+		if(bytes == 1 && msgLenth > 0)
 		{
 			uint16_t msgLenth = ntohs(msgLenth);
 			char msg[msgLenth + 1];
@@ -100,25 +103,24 @@ void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, i
 	strcpy(users[index].name, name);
 }
 
-
-void populateUserList(int s, struct username * users, uint16_t numberOfUsers)
+void receiveSentUserNames(int s, uint16_t numberOfUsers)
 {
-	printf("Number of Users:  %d\n", ntohs(numberOfUsers));
-	users = realloc(users, numberOfUsers * sizeof(struct username));
-
+	printf("Number Of Users: %d\n", numberOfUsers);
 	int i;
 	for(i = 0; i < numberOfUsers; i++)
 	{
 		uint8_t len;
 		int bytes;
-		while(1) 
-		{ 
+		while(1) // get the username length
+		{
 			bytes = recv(s, &len, sizeof(len), 0);
-			if(bytes == 1) 
+			if(bytes == 1 && len > 0)
 				break;
 		}
 
-		users[i].length = len;
+		char name[len + 1];
+		getStringFromRecv(s, name, len);
+		printf("user[%d]: %s\n", i, name);
 	}
 }
 
@@ -156,7 +158,6 @@ void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
 
 	printf("\n");
 }
-
 
 int main(int argc, char** argv)
 {	
@@ -221,7 +222,6 @@ int main(int argc, char** argv)
 			int len = (int)strlen(username);
 			send(s, &len, sizeof(len), 0); // send username length
 			send(s, username, sizeof(username), 0);
-			// printf("Name: %s\n", username);
 
 			pid_t forkID = fork();
 			while(1)
@@ -249,9 +249,15 @@ int main(int argc, char** argv)
 				else // child process wants to always listen to the incoming messages
 				{
 					uint8_t messageFlag;
-					if(recv(s, &messageFlag, sizeof(messageFlag), 0) > 0) // received the flag
+					int bytes;
+					while(1)
 					{	
-						receiveMessage(s, messageFlag, users, &numberOfUsers);
+						bytes = recv(s, &messageFlag, sizeof(messageFlag), 0);
+						if(bytes == 1)
+						{
+							printf("Incoming message: %x\n", messageFlag);
+							receiveMessage(s, messageFlag, users, &numberOfUsers);
+						}
 					}
 				}
 			}
