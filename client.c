@@ -82,6 +82,16 @@ void receiveMessage(int s, int flag) // expecting length string (msglen msg is f
 
 	if(ntohl(flag) == 0x00) // regular message
 	{
+		userLen = ntohs(userLen);
+		char name[userLen + 1];
+		getStringFromRecv(s, name, userLen);
+		printf("User %s of length: %d \n", name, userLen);
+	}
+
+	printf("the flag is: %d \n", flag);
+
+	if(flag == 0x00) // regular message
+	{
 		uint16_t msgLenth;
 		if((bytes = recv(s, &msgLenth, sizeof(msgLenth), 0)) > 0)
 		{

@@ -149,6 +149,48 @@ void sendMessageToAllUsers(struct username * users, int numberOfUsers, int messa
 	}
 }
 
+void sendUsernameAndLength(int fd, struct username * users, int numberOfUsers, char * username, int usernameLength)
+{
+	int usernameLengthInNBO = htons(usernameLength);
+	int sendByte = send(fd, &usernameLengthInNBO, sizeof(usernameLengthInNBO), 0);
+	// printf("send byte: %d\n",sendByte);
+	int k;
+	for(k = 0; k < usernameLength; k++)
+	{
+		int byteSent = send(fd, &username[k], sizeof(username[k]), 0);
+		// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
+	}
+}
+
+void sendUpdateToAllUsers(struct username * users, int numberOfUsers, int flag)
+{
+	printf("in send leave update\n");
+	int index;
+	for(index = 0; index < numberOfUsers; index++) 
+	{
+		int fd = users[index].fd;
+		uint8_t usernameLength = users[index].length;
+		char username[usernameLength];
+		strcpy(username, users[index].name);
+		if (flag == 2)
+		{
+			int flag = htonl(0x02); // send leave message flag
+			printf("sending leave flag: %d\n", flag);
+		}
+		else if (flag == 1){
+			int flag = htonl(0x01);
+			printf("sending join flag: %d\n", flag);
+		}
+		send(fd, &flag, sizeof(flag), 0);
+		printf("sent flag\n");
+
+		sendUsernameAndLength(fd, users, numberOfUsers, username, usernameLength);
+
+		// send(fd, message, sizeof(message), 0);
+		printf("sent user update: %s to fd: %d \n",username, fd);
+	}
+}
+
 int main(void)
 {
 	// int newfd; // max file descriptor number, listening socket descriptor, newly accepted sockect descriptor
@@ -234,6 +276,7 @@ int main(void)
 
 					if(isUniqueUsername(users, numberOfUsers, username))
 					{
+						sendUpdateToAllUsers(users, numberOfUsers, 1);
 						numberOfUsers = numberOfUsers + 1;
 						users = realloc(users, numberOfUsers * sizeof(user));
 
@@ -267,6 +310,7 @@ int main(void)
 						if(nbytes == 0) // got error or connection closed by client
 						{
 							printf("Selected Server: socket %d hung up\n", i);
+							
 						}
 						else
 						{
@@ -280,6 +324,9 @@ int main(void)
 
 
 						numberOfUsers = numberOfUsers -1;
+
+						sendUpdateToAllUsers(users, numberOfUsers, 2);
+
 						printf("after deleteUser\n");
 
 
