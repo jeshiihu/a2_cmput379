@@ -60,7 +60,7 @@ void getStringFromRecv(int s, char * str, uint8_t len)
 
 void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numberOfUsers) // expecting length string (msglen msg is flag is 0x00)
 {
-	// printf("the flag is: %x \n", flag);
+	printf("Incoming message, Flag is received: %x \n", flag);
 	uint8_t msg = 0x00;
 	uint8_t join = 0x01;
 	uint8_t leave = 0x02;
