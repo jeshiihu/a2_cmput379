@@ -241,12 +241,17 @@ int main(void)
 	FD_SET(listener, &master); // add the listener to the master set
 	int fdmax = listener; // keep track of the biggest file descriptors, for now its the listener
 
+	struct timeval timeout;
+	timeout.tv_sec = 10;
+	timeout.tv_usec = 0;
+
 	while (1) // -------------------------------------------------------- while loop --------------------------------------------------
 	{
-		fprintf(stderr, "========= Starting while loop =========\n");
+		//fprintf(stderr, "========= Starting while loop =========\n");
 
 		read_fds = master; // copy it
-		if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
+
+		if(select(fdmax+1, &read_fds, NULL, NULL, &timeout) == -1)
 		{
 			perror("Server: cannot select file descriptor");
 			exit(1);
