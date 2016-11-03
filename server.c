@@ -112,7 +112,9 @@ void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUse
 int getUsernameLength(int listener)
 {
 	int i;
-	recv(listener, &i, sizeof(i), 0);
+	int bytes = recv(listener, &i, sizeof(i), 0);
+	if(bytes == -1)
+		printf("TIMEOUT\n");
 
 	return i;
 }
@@ -120,7 +122,9 @@ int getUsernameLength(int listener)
 uint16_t getMessageLength(int listener)
 {
 	uint16_t i;
-	recv(listener, &i, sizeof(i), 0);
+	int bytes = recv(listener, &i, sizeof(i), 0);
+	if(bytes == -1)
+		printf("TIMEOUT\n");
 
 	return i;
 }
@@ -206,23 +210,10 @@ void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char*
 	for(index = 0; index < numberOfUsers; index++) 
 	{
 		int fd = users[index].fd;
-
-		if (flag == ((uint8_t)0x02))
-		{
-			// int flag = htonl(0x02); // send leave message flag
-			printf("sending leave flag: %x\n", flag);
-		}
-		else if (flag == ((uint8_t)0x01)){
-			// int flag = htonl(0x01);
-			printf("sending join flag: %x\n", flag);
-		}
-		
 		send(fd, &flag, sizeof(flag), 0);
 		printf("sent flag\n");
 
 		sendUsernameAndLength(fd, users, numberOfUsers, username, usernameLength);
-
-		// send(fd, message, sizeof(message), 0);
 		printf("sent user update: %s to fd: %d \n",username, fd);
 	}
 }
@@ -246,23 +237,15 @@ void receiveString(int s, char * str, int len)
 	}
 
 	str[len] = '\0';
-	printf("Received String: %s\n", str);
 }
 
 int main(void)
 {
-	// int newfd; // max file descriptor number, listening socket descriptor, newly accepted sockect descriptor
-		
-	// char buf[256]; // data for client buffer
-	// int nbytes;
-
-	// int i, j,rv;
 	struct username user; // used to get size
 	struct username * users = malloc(1 * sizeof(user));
 	uint16_t numberOfUsers = 0;
 
 	int listener = getListener();
-
 	// get us a socket and bind it
 	struct sockaddr_in sa;
 	memset(&sa, 0, sizeof(sa));
@@ -294,17 +277,10 @@ int main(void)
 	FD_SET(listener, &master); // add the listener to the master set
 	int fdmax = listener; // keep track of the biggest file descriptors, for now its the listener
 
-	struct timeval timeout;
-	timeout.tv_sec = 10;
-	timeout.tv_usec = 0;
-
 	while (1) // -------------------------------------------------------- while loop --------------------------------------------------
 	{
-		//fprintf(stderr, "========= Starting while loop =========\n");
-
 		read_fds = master; // copy it
-
-		if(select(fdmax+1, &read_fds, NULL, NULL, &timeout) == -1)
+		if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
 		{
 			perror("Server: cannot select file descriptor");
 			exit(1);
@@ -321,7 +297,7 @@ int main(void)
 					socklen_t addrlen = sizeof(remoteaddr);
 
 					int newfd = accept(listener, (struct sockaddr*)&remoteaddr, &addrlen);
-
+					
 					if (newfd < 0) 
 					{
 						perror ("Server: accept failed");
@@ -366,9 +342,12 @@ int main(void)
 				}
 				else 
 				{ // handling data from clients!!
-					char buf[256]; // data for client buffer, their messages
+					printf("data from client\n");
+
 					int nbytes;
 					uint16_t messageLength;
+
+
 
 					if((nbytes = recv(i, &messageLength, sizeof(messageLength), 0)) <= 0)
 					{
@@ -398,9 +377,17 @@ int main(void)
 					}
 					else
 					{
+						printf("NBytes: %d, message length: %d\n" , nbytes, messageLength);
+
 						// get message and send to everyone...
 						messageLength = ntohs(messageLength);
 						printf("message length: %d\n", messageLength);
+
+						if(messageLength == 0)
+						{
+							printf("dummy\n");
+							continue;
+						}
 
 						char message[messageLength + 1]; // required for adding a null terminator
 						receiveString(i, message, messageLength);
@@ -416,47 +403,7 @@ int main(void)
 						}
 
 						sendMessageToAllUsers(users, numberOfUsers, users[index].name, users[index].length, messageLength, message);
-
-						// int index;
-						// for(index = 0; index < numberOfUsers; index++) 
-						// {
-						// 	int fd = users[index].fd;
-
-						// 	int messageLengthInNBO = htons(messageLength);
-						// 	int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
-						// 	printf("send byte: %d\n",sendByte);
-						// 	int k;
-						// 	for(k = 0; k < messageLength; k++)
-						// 	{
-						// 		int byteSent = send(fd, &message[k], sizeof(message[k]), 0);
-						// 		printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
-						// 	}
-
-						// 	// send(fd, message, sizeof(message), 0);
-						// 	printf("sent message: %s to fd: %d \n",message, fd);
-						// }
 					}
-					// int keepAliveTime = 3000;
-					// clock_t before = clock()*1000/CLOCKS_PER_SEC;
-					// while(1)
-					// {
-					// 	int keepAlive;
-					// 	int current = clock()*1000/CLOCKS_PER_SEC;
-					// 	if((current - before) >= keepAliveTime)
-					// 	{
-					// 		if(recv(newfd, &keepAlive, sizeof(keepAlive), 0) == 0 ||
-					// 			recv(newfd, &keepAlive, sizeof(keepAlive), 0) == -1)
-					// 		{
-					// 			printf("Closing socket connection with client\n");
-					// 			close(newfd);
-					// 			break;
-					// 		}
-
-					// 		if(ntohl(keepAlive) == 0)
-					// 			printf("recieved keep alice\n");
-					// 		before = clock()*1000/CLOCKS_PER_SEC;
-					// 	}
-					// }
 				} // ending if/else to handle data from the client
 			} // ending if got a new incoming connection
 		} // ending for loop, going through all file descriptors

@@ -83,7 +83,6 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 
 	if(flag == msg) // regular message
 	{
-
 		uint16_t msgLength;
 		while(1)
 		{
@@ -248,27 +247,67 @@ int main(int argc, char** argv)
 				
 				if(forkID == 0) // if parent then always wait for client input message
 				{
-					if(message = inputMessage(stdin, sizeof(uint16_t)))
+					pid_t pidInput = fork();
+					if(pidInput == 0) // parent waiting to user input
 					{
-						messageLength = strlen(message);
+						if(message = inputMessage(stdin, sizeof(uint16_t)))
+						{
+							messageLength = strlen(message);
 
-						int messageLengthInNBO = htons(messageLength);
-						send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
-						
-						char sentMessage[messageLength];
-						strcpy(sentMessage, message);
+							int messageLengthInNBO = htons(messageLength);
+							int bytes = send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
+							if(bytes < 0)
+							{
+								printf("Error: Closing connection\n");
+								close(s);
+								exit(1);
+							}
 
-						send(s, sentMessage, sizeof(sentMessage), 0);
-	
-						free(message);
+							char sentMessage[messageLength];
+							strcpy(sentMessage, message);
+
+							bytes = send(s, sentMessage, sizeof(sentMessage), 0);
+							if(bytes < 0)
+							{
+								printf("Error: Closing connection\n");
+								close(s);
+								exit(1);
+							}
+
+							free(message);
+						}
+					}
+					else // sleep for 30 then send dummy
+					{
+						while(1)
+						{
+							sleep(10);
+							uint16_t dummyLength = htons(0);
+							int bytes = send(s, &dummyLength, sizeof(dummyLength), 0);
+							
+							if(bytes < 0)
+							{
+								printf("Error: Closing connection\n");
+								close(s);
+								exit(1);
+							}
+							printf("sending dummy\n");
+						}
 					}
 				}
 				else // child process wants to always listen to the incoming messages
 				{
 					uint8_t messageFlag;
-					if(recv(s, &messageFlag, sizeof(messageFlag), 0) > 0) // received the flag
+					int bytes = recv(s, &messageFlag, sizeof(messageFlag), 0);
+					if(bytes > 0) // received the flag
 					{	
 						receiveMessage(s, messageFlag, users, &numberOfUsers);
+					}
+					else
+					{
+						printf("Error: Closing connection\n");
+						close(s);
+						exit(1);
 					}
 				}
 			}
