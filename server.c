@@ -377,7 +377,7 @@ int main(void)
 					}
 					else
 					{
-						printf("NBytes: %d, message length: %d\n" , nbytes, messageLength);
+						// printf("NBytes: %d, message length: %d\n" , nbytes, messageLength);
 
 						// get message and send to everyone...
 						messageLength = ntohs(messageLength);
@@ -385,9 +385,11 @@ int main(void)
 
 						if(messageLength == 0)
 						{
-							printf("dummy\n");
 							continue;
 						}
+						// 	printf("dummy\n");
+						// 	continue;
+						// }
 
 						char message[messageLength + 1]; // required for adding a null terminator
 						receiveString(i, message, messageLength);

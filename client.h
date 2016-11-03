@@ -8,6 +8,7 @@
 #include <strings.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 
 // #define	 MY_PORT  2222
 
@@ -19,6 +20,13 @@ struct username
 {
 	uint8_t length;
 	char* name;
+};
+
+struct threadData
+{
+	int s;
+	struct username * users;
+	uint16_t numberOfUsers;
 };
 
 // struct username user;
@@ -35,5 +43,6 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, int len);
 void printCurrentUserList(struct username * users, uint16_t numberOfUsers);
 
-// void getCurrentUserList(int s, struct username * users, int numberOfUsers);
+void* listenToInput(void* param);
+void* listenToServer(void* param);
 

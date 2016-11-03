@@ -29,14 +29,18 @@ char *inputMessage(FILE* fp, size_t size)
 
 bool receivedHandshake(int s)
 {
+	printf("inside handshake\n");
 	uint8_t * handshakeBuf = malloc(2 * sizeof(uint8_t));
 	int bytes;
 	bytes = recv(s, handshakeBuf, 2* sizeof(uint8_t),0);
 
 	uint8_t first = 0xcf;
 	uint8_t second = 0xaf;
+	printf("hand0: %x, hand1: %x\n", handshakeBuf[0], handshakeBuf[1]);
 	if(handshakeBuf[0] == first && handshakeBuf[1] == second)
+	{
 		return true;
+	}
 
 	return false;
 }
@@ -110,13 +114,20 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 
 void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, int len)
 {
-	*numberOfUsers = *numberOfUsers + 1;
-	int index = (*numberOfUsers) - 1;
-	users = realloc(users, (*numberOfUsers) * sizeof(struct username));
+	// printCurrentUserList(users, *numberOfUsers);
+
+	int index = (*numberOfUsers);
+	if(*numberOfUsers == 0)
+		users = malloc(1 * sizeof(struct username));
+	else
+		users = realloc(users, (*numberOfUsers) * sizeof(struct username));
 
 	users[index].length = len;
 	users[index].name = malloc(len * sizeof(char));
 	strcpy(users[index].name, name);
+
+	*numberOfUsers = *numberOfUsers + 1;
+
 }
 
 
@@ -150,9 +161,11 @@ void printCurrentUserList(struct username * users, uint16_t numberOfUsers)
 		printf("users[%d] = %s\n", i, users[i].name);
 }
 
-void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
+void recvAllCurrentUsers(int s, uint16_t numberOfUsers, struct username * users)
 {
 	printf("Number of current users: %d\n", numberOfUsers);
+	if(numberOfUsers > 0)
+		users = realloc(users, numberOfUsers*sizeof(struct username));
 
 	int i;
 	for(i = 0; i < numberOfUsers; i++)
@@ -167,6 +180,11 @@ void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
 
 		char name[len+1];
 		getStringFromRecv(s, name, len);
+
+		users[i].length = len;
+		users[i].name = malloc(len * sizeof(char));
+		strcpy(users[i].name, name);
+
 		printf("user[%d]: %s\n", i, name);
 	}
 
@@ -182,9 +200,13 @@ int main(int argc, char** argv)
 		return 0; 
 	}
 
-	struct username user;
-	struct username * users = malloc(1 * sizeof(user));
-	uint16_t numberOfUsers = 0;
+	// struct username user;
+	// struct username * users = malloc(1 * sizeof(user));
+	// uint16_t numberOfUsers = 0;
+
+	struct threadData data;
+	data.numberOfUsers = 0;
+	data.users = malloc(1 * sizeof(struct username));
 
 	// get the client inputs!
 	char hostname[strlen(argv[1])];
@@ -197,7 +219,7 @@ int main(int argc, char** argv)
 	char username[strlen(argv[3])];
 	strcpy(username, argv[3]);
 
-	int	s, number;
+	// int	s, number;
 
 	struct	sockaddr_in	server;
 
@@ -210,9 +232,9 @@ int main(int argc, char** argv)
 	}
 
 	while (1) {
-		s = socket (AF_INET, SOCK_STREAM, 0);
+		data.s = socket (AF_INET, SOCK_STREAM, 0);
 
-		if (s < 0) {
+		if (data.s < 0) {
 			perror ("Client: cannot open socket");
 			exit (1);
 		}
@@ -222,98 +244,118 @@ int main(int argc, char** argv)
 		server.sin_family = host->h_addrtype;
 		server.sin_port = htons(port);
 
-		if (connect (s, (struct sockaddr*) & server, sizeof (server))) {
+		if (connect (data.s, (struct sockaddr*) & server, sizeof (server))) {
 			perror ("Client: cannot connect to server");
 			exit (1);
 		}
 
 		// if flag is 0 then it works exactly like read();
-		if(receivedHandshake(s))
+		if(receivedHandshake(data.s))
 		{
-			recv(s, &numberOfUsers, sizeof(numberOfUsers), 0);
-			numberOfUsers = ntohs(numberOfUsers);
-			recvAllCurrentUsers(s, numberOfUsers);
-			
+			printf("successful handshake!\n");
+			recv(data.s, &(data.numberOfUsers), sizeof(uint16_t), 0);
+			data.numberOfUsers = ntohs(data.numberOfUsers);
+
+			recvAllCurrentUsers(data.s, data.numberOfUsers, data.users);
+			printf("received all users, double check with print\n");
+			printCurrentUserList(data.users, data.numberOfUsers);
+			printf("\n");
+
 			int len = (int)strlen(username);
-			send(s, &len, sizeof(len), 0); // send username length
-			send(s, username, sizeof(username), 0);
-			// printf("Name: %s\n", username);
+			send(data.s, &len, sizeof(len), 0); // send username length
+			send(data.s, username, sizeof(username), 0);
 
-			pid_t forkID = fork();
-			while(1)
+
+			pthread_t threadInput;
+			if(pthread_create(&threadInput, NULL, listenToInput, &data))
 			{
-				char *message;
-				uint16_t messageLength;
-				
-				if(forkID == 0) // if parent then always wait for client input message
-				{
-					pid_t pidInput = fork();
-					if(pidInput == 0) // parent waiting to user input
-					{
-						if(message = inputMessage(stdin, sizeof(uint16_t)))
-						{
-							messageLength = strlen(message);
+				perror("Thread listen to input failed.");
+				exit(1);
+			}
 
-							int messageLengthInNBO = htons(messageLength);
-							int bytes = send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
-							if(bytes < 0)
-							{
-								printf("Error: Closing connection\n");
-								close(s);
-								exit(1);
-							}
+			pthread_t threadServer;
+			if(pthread_create(&threadServer, NULL, listenToServer, &(data.s)))
+			{
+				perror("Thread listen to server failed.");
+				exit(1);
+			}
 
-							char sentMessage[messageLength];
-							strcpy(sentMessage, message);
-
-							bytes = send(s, sentMessage, sizeof(sentMessage), 0);
-							if(bytes < 0)
-							{
-								printf("Error: Closing connection\n");
-								close(s);
-								exit(1);
-							}
-
-							free(message);
-						}
-					}
-					else // sleep for 30 then send dummy
-					{
-						while(1)
-						{
-							sleep(10);
-							uint16_t dummyLength = htons(0);
-							int bytes = send(s, &dummyLength, sizeof(dummyLength), 0);
-							
-							if(bytes < 0)
-							{
-								printf("Error: Closing connection\n");
-								close(s);
-								exit(1);
-							}
-							printf("sending dummy\n");
-						}
-					}
-				}
-				else // child process wants to always listen to the incoming messages
-				{
-					uint8_t messageFlag;
-					int bytes = recv(s, &messageFlag, sizeof(messageFlag), 0);
-					if(bytes > 0) // received the flag
-					{	
-						receiveMessage(s, messageFlag, users, &numberOfUsers);
-					}
-					else
-					{
-						printf("Error: Closing connection\n");
-						close(s);
-						exit(1);
-					}
-				}
+			if(pthread_join(threadInput, NULL)) 
+			{
+				perror("Error joining threadInput.");
+				exit(1);
+			}
+			if(pthread_join(threadServer, NULL)) 
+			{
+				perror("Error joining threadServer.");
+				exit(1);
 			}
 		}
-		close(s);
+		close(data.s);
 	}
 
 	return 0;
+}
+
+void* listenToInput(void* param)
+{
+	while(1)
+	{	
+		int* s = (int*)param;
+		char *message;
+		uint16_t messageLength;
+		
+		message = inputMessage(stdin, sizeof(uint16_t));
+		if(strlen(message) > 0)
+		{
+			messageLength = strlen(message);
+
+			int messageLengthInNBO = htons(messageLength);
+			int bytes = send(*s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
+			if(bytes < 0)
+			{
+				printf("Error: Closing connection\n");
+				close(*s);
+				exit(1);
+			}
+
+			char sentMessage[messageLength];
+			strcpy(sentMessage, message);
+
+			bytes = send(*s, sentMessage, sizeof(sentMessage), 0);
+			if(bytes < 0)
+			{
+				printf("Error: Closing connection\n");
+				close(*s);
+				exit(1);
+			}
+
+			free(message);
+		}
+	}
+
+	return NULL;
+}
+
+void* listenToServer(void* param)
+{
+	while(1)
+	{
+		struct threadData* data = (struct threadData*)param;
+		uint8_t messageFlag;
+		int bytes = recv(data->s, &messageFlag, sizeof(messageFlag), 0);
+		if((bytes == 1 && (messageFlag == (uint8_t)(0x01) || messageFlag == (uint8_t)(0x02))) ||
+			(bytes == 2 && messageFlag == (uint8_t)(0x00))) // received the flag
+		{	
+			receiveMessage(data->s, messageFlag, data->users, &(data->numberOfUsers));
+		}
+		else
+		{
+			printf("Error: Closing connection\n");
+			close(data->s);
+			exit(1);
+		}
+	}
+
+	return NULL;
 }
