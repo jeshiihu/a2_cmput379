@@ -162,7 +162,7 @@ void sendString(int s, char* str, int len)
 	}
 }
 
-void sendMessageToAllUsers(struct username * users, uint16_t numberOfUsers, int messageLength, char * message)
+void sendMessageToAllUsers(struct username * users, uint16_t numberOfUsers, char* sendingUser, uint8_t sendingUserLen, int messageLength, char * message)
 {
 	int index;
 	for(index = 0; index < numberOfUsers; index++) 
@@ -172,19 +172,15 @@ void sendMessageToAllUsers(struct username * users, uint16_t numberOfUsers, int 
 		uint8_t flag = 0x00; // send regular message flag
 		send(fd, &flag, sizeof(flag), 0);
 
+		// send username!
+		int byte = send(fd, &sendingUserLen, sizeof(sendingUserLen), 0);
+		sendString(fd, sendingUser, sendingUserLen);
+
 		uint16_t messageLengthInNBO = htons(messageLength);
 		int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
-		// printf("send byte: %d\n",sendByte);
 		
 		sendString(fd, message, messageLength);
-		// int k;
-		// for(k = 0; k < messageLength; k++)
-		// {
-		// 	int byteSent = send(fd, &message[k], sizeof(message[k]), 0);
-		// 	// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
-		// }
 
-		// send(fd, message, sizeof(message), 0);
 		printf("sent message: %s to fd: %d \n",message, fd);
 	}
 }
@@ -196,15 +192,6 @@ void sendUsernameAndLength(int fd, struct username * users, uint16_t numberOfUse
 	// printf("send byte: %d\n",sendByte);
 	
 	sendString(fd, username, usernameLength);
-	
-
-	// int k;
-	// for(k = 0; k < usernameLength; k++)
-	// {
-	// 	int byteSent = send(fd, &username[k], sizeof(username[k]), 0);
-	// 	// printf("sending character: %c to fd: %d\n", username[k], fd);
-	// 	// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
-	// }
 }
 
 void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char* name, uint8_t nameLen,  uint8_t flag)
@@ -238,6 +225,28 @@ void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char*
 		// send(fd, message, sizeof(message), 0);
 		printf("sent user update: %s to fd: %d \n",username, fd);
 	}
+}
+
+void receiveString(int s, char * str, int len)
+{
+	int i;
+	for(i = 0; i < len; i++)
+	{
+		char c;
+		
+		while(1)
+		{
+			int bytes = recv(s, &c, sizeof(c), 0);
+			if(bytes == 1 && (strlen(&c) != 0))
+			{
+				str[i] = c;
+				break;
+			}
+		}
+	}
+
+	str[len] = '\0';
+	printf("Received String: %s\n", str);
 }
 
 int main(void)
@@ -366,7 +375,6 @@ int main(void)
 						if(nbytes == 0) // got error or connection closed by client
 						{
 							printf("Selected Server: socket %d hung up\n", i);
-							
 						}
 						else
 						{
@@ -374,7 +382,6 @@ int main(void)
 						}
 
 						int index = getUserIndex(users, numberOfUsers, i);
-						// sendMessageToAllUsers(users, numberOfUsers, users[index].length, users[index].name);
 
 						uint8_t usernameLen = users[index].length;
 						char username[usernameLen];
@@ -396,11 +403,19 @@ int main(void)
 						printf("message length: %d\n", messageLength);
 
 						char message[messageLength + 1]; // required for adding a null terminator
-						recv(i, &message, messageLength, 0);
-						message[messageLength] = '\0';
+						receiveString(i, message, messageLength);
 						printf("message recieved: %s\n", message);
 
-						sendMessageToAllUsers(users, numberOfUsers, messageLength, message);
+						int index;
+						for(index = 0; index < numberOfUsers; index++)
+						{
+							if(users[index].fd == i) // found user!
+							{
+								break;
+							}
+						}
+
+						sendMessageToAllUsers(users, numberOfUsers, users[index].name, users[index].length, messageLength, message);
 
 						// int index;
 						// for(index = 0; index < numberOfUsers; index++) 
@@ -445,8 +460,6 @@ int main(void)
 				} // ending if/else to handle data from the client
 			} // ending if got a new incoming connection
 		} // ending for loop, going through all file descriptors
-
-		sleep(1);
 	}  // ending while loop
 
 	return 0;

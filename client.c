@@ -60,12 +60,10 @@ void getStringFromRecv(int s, char * str, int len)
 	}
 
 	str[len] = '\0';
-	printf("Received String: %s\n", str);
 }
 
 void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numberOfUsers) // expecting length string (msglen msg is flag is 0x00)
 {
-	// printf("the flag is: %x \n", flag);
 	uint8_t msg = 0x00;
 	uint8_t join = 0x01;
 	uint8_t leave = 0x02;
@@ -85,16 +83,22 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 
 	if(flag == msg) // regular message
 	{
-		uint16_t msgLenth;
-		if((bytes = recv(s, &msgLenth, sizeof(msgLenth), 0)) > 0)
+
+		uint16_t msgLength;
+		while(1)
 		{
-			uint16_t msgLenth = ntohs(msgLenth);
-			char msg[msgLenth + 1];
-			// int byte = recv(s, &msg, sizeof(msg), 0);
-			// msg[msgLenth] = '\0';
-			getStringFromRecv(s, msg, msgLenth);
-			printf("User %s: %s\n", name, msg);
+			bytes = recv(s, &msgLength, sizeof(msgLength), 0);
+			msgLength = ntohs(msgLength);
+
+			if(bytes == 2 && msgLength > 0)
+			{
+				break;
+			}
 		}
+
+		char msg[msgLength + 1];
+		getStringFromRecv(s, msg, msgLength);
+		printf("User %s: %s\n", name, msg);
 	}
 	else if(flag == join)
 	{
@@ -162,11 +166,7 @@ void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
 				break;
 		}
 
-		printf("UsernameLength: %d\n", len);
-
 		char name[len+1];
-		// int bytes = recv(s, &name, sizeof(name), 0);
-		// name[len] = '\0';
 		getStringFromRecv(s, name, len);
 		printf("user[%d]: %s\n", i, name);
 	}
@@ -273,8 +273,6 @@ int main(int argc, char** argv)
 				}
 			}
 		}
-
-		sleep(1);
 		close(s);
 	}
 

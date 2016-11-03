@@ -32,7 +32,11 @@ struct username* deleteUser(struct username * users, uint16_t size, int fd);
 void sendInitialHandshake(int sock);
 void sendNumberOfUsers(int sock, uint16_t numUsers);
 void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUsers);
+void sendMessageToAllUsers(struct username * users, uint16_t numberOfUsers, char* sendingUser, uint8_t sendingUserLen, int messageLength, char * message);
+
 
 int getUsernameLength(int sock);
 uint16_t getMessageLength(int sock);
 bool isUniqueUsername(struct username * users, uint16_t size, char* newUser);
+
+void receiveString(int s, char * str, int len);
