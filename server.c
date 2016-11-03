@@ -102,7 +102,9 @@ void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUse
 		printf("%d bytes sent, len of user: %d\n", bytes, users[i].length);
 
 		int expectedBytes = sizeof(users[i].name);
-		bytes = send(listener, users[i].name, sizeof(users[i].name), 0);
+		sendString(listener, users[i].name, len);
+
+		// bytes = send(listener, users[i].name, sizeof(users[i].name), 0);
 		printf("Expected %d bytes, %d bytes sent, : %s\n", expectedBytes, bytes, users[i].name);
 	}
 }
@@ -146,6 +148,20 @@ int getListener()
 	return listener;
 }
 
+void sendString(int s, char* str, int len)
+{
+	int i;
+	for(i = 0; i < len; i++)
+	{
+		while(1)
+		{
+			int bytes = send(s, &str[i], sizeof(str[i]), 0);
+			if(bytes == 1)
+				break;
+		}
+	}
+}
+
 void sendMessageToAllUsers(struct username * users, uint16_t numberOfUsers, int messageLength, char * message)
 {
 	int index;
@@ -159,12 +175,14 @@ void sendMessageToAllUsers(struct username * users, uint16_t numberOfUsers, int 
 		uint16_t messageLengthInNBO = htons(messageLength);
 		int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
 		// printf("send byte: %d\n",sendByte);
-		int k;
-		for(k = 0; k < messageLength; k++)
-		{
-			int byteSent = send(fd, &message[k], sizeof(message[k]), 0);
-			// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
-		}
+		
+		sendString(fd, message, messageLength);
+		// int k;
+		// for(k = 0; k < messageLength; k++)
+		// {
+		// 	int byteSent = send(fd, &message[k], sizeof(message[k]), 0);
+		// 	// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
+		// }
 
 		// send(fd, message, sizeof(message), 0);
 		printf("sent message: %s to fd: %d \n",message, fd);
@@ -176,13 +194,17 @@ void sendUsernameAndLength(int fd, struct username * users, uint16_t numberOfUse
 	uint8_t usernameLengthInNBO = usernameLength;
 	int sendByte = send(fd, &usernameLengthInNBO, sizeof(usernameLengthInNBO), 0);
 	// printf("send byte: %d\n",sendByte);
-	int k;
-	for(k = 0; k < usernameLength; k++)
-	{
-		int byteSent = send(fd, &username[k], sizeof(username[k]), 0);
-		// printf("sending character: %c to fd: %d\n", username[k], fd);
-		// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
-	}
+	
+	sendString(fd, username, usernameLength);
+	
+
+	// int k;
+	// for(k = 0; k < usernameLength; k++)
+	// {
+	// 	int byteSent = send(fd, &username[k], sizeof(username[k]), 0);
+	// 	// printf("sending character: %c to fd: %d\n", username[k], fd);
+	// 	// printf("%d byte sent, character sent: %c\n", byteSent, message[k]);
+	// }
 }
 
 void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char* name, uint8_t nameLen,  uint8_t flag)
@@ -337,7 +359,7 @@ int main(void)
 				{ // handling data from clients!!
 					char buf[256]; // data for client buffer, their messages
 					int nbytes;
-					int messageLength;
+					uint16_t messageLength;
 
 					if((nbytes = recv(i, &messageLength, sizeof(messageLength), 0)) <= 0)
 					{
@@ -359,15 +381,10 @@ int main(void)
 						strcpy(username, users[index].name);
 
 						users = deleteUser(users, numberOfUsers, i); //delete user that disconnected
-
-
 						numberOfUsers = numberOfUsers -1;
-
 						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 2);
 
 						printf("after deleteUser\n");
-
-
 						printUsers(users, numberOfUsers);
 						close(i);
 						FD_CLR(i, &master);

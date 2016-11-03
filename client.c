@@ -41,10 +41,26 @@ bool receivedHandshake(int s)
 	return false;
 }
 
-void getStringFromRecv(int s, char * str, uint8_t len)
+void getStringFromRecv(int s, char * str, int len)
 {
-	// int bytes = recv(s, &name, sizeof(name), 0);
-	// name[len] = '\0';
+	int i;
+	for(i = 0; i < len; i++)
+	{
+		char c;
+		
+		while(1)
+		{
+			int bytes = recv(s, &c, sizeof(c), 0);
+			if(bytes == 1 && (strlen(&c) != 0))
+			{
+				str[i] = c;
+				break;
+			}
+		}
+	}
+
+	str[len] = '\0';
+	printf("Received String: %s\n", str);
 }
 
 void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numberOfUsers) // expecting length string (msglen msg is flag is 0x00)
@@ -63,9 +79,9 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 	}
 
 	char name[userLen + 1];
-	bytes = recv(s, &name, sizeof(name), 0);
-	name[userLen] = '\0';
-	// getStringFromRecv(s, name, userLen);
+	// bytes = recv(s, &name, sizeof(name), 0);
+	// name[userLen] = '\0';
+	getStringFromRecv(s, name, userLen);
 
 	if(flag == msg) // regular message
 	{
@@ -74,9 +90,9 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 		{
 			uint16_t msgLenth = ntohs(msgLenth);
 			char msg[msgLenth + 1];
-			int byte = recv(s, &msg, sizeof(msg), 0);
-			msg[msgLenth] = '\0';
-			// getStringFromRecv(s, msg, msgLenth);
+			// int byte = recv(s, &msg, sizeof(msg), 0);
+			// msg[msgLenth] = '\0';
+			getStringFromRecv(s, msg, msgLenth);
 			printf("User %s: %s\n", name, msg);
 		}
 	}
@@ -149,8 +165,9 @@ void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
 		printf("UsernameLength: %d\n", len);
 
 		char name[len+1];
-		int bytes = recv(s, &name, sizeof(name), 0);
-		name[len] = '\0';
+		// int bytes = recv(s, &name, sizeof(name), 0);
+		// name[len] = '\0';
+		getStringFromRecv(s, name, len);
 		printf("user[%d]: %s\n", i, name);
 	}
 
