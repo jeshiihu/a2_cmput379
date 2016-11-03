@@ -247,9 +247,9 @@ int main(int argc, char** argv)
 				
 				if(forkID == 0) // if parent then always wait for client input message
 				{
-					pid_t pidInput = fork();
-					if(pidInput == 0) // parent waiting to user input
-					{
+					//pid_t pidInput = fork();
+					// if(pidInput == 0) // parent waiting to user input
+					// {
 						if(message = inputMessage(stdin, sizeof(uint16_t)))
 						{
 							messageLength = strlen(message);
@@ -276,24 +276,24 @@ int main(int argc, char** argv)
 
 							free(message);
 						}
-					}
-					else // sleep for 30 then send dummy
-					{
-						while(1)
-						{
-							sleep(10);
-							uint16_t dummyLength = htons(0);
-							int bytes = send(s, &dummyLength, sizeof(dummyLength), 0);
+					//}
+					// else // sleep for 30 then send dummy
+					// {
+					// 	while(1)
+					// 	{
+					// 		sleep(10);
+					// 		uint16_t dummyLength = htons(0);
+					// 		int bytes = send(s, &dummyLength, sizeof(dummyLength), 0);
 							
-							if(bytes < 0)
-							{
-								printf("Error: Closing connection\n");
-								close(s);
-								exit(1);
-							}
-							printf("sending dummy\n");
-						}
-					}
+					// 		if(bytes < 0)
+					// 		{
+					// 			printf("Error: Closing connection\n");
+					// 			close(s);
+					// 			exit(1);
+					// 		}
+					// 		printf("sending dummy\n");
+					// 	}
+					// }
 				}
 				else // child process wants to always listen to the incoming messages
 				{
