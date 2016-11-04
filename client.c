@@ -95,8 +95,6 @@ void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, i
 	users[index].name = malloc((len+1) * sizeof(char));
 	strcpy(users[index].name, name);
 	*numberOfUsers = *numberOfUsers + 1;
-
-	// printCurrentUserList(users, *numberOfUsers);
 }
 
 void printCurrentUserList(struct username * users, int numberOfUsers)
@@ -141,7 +139,6 @@ void sendStringClient(int s, char* str, int len)
 			int bytes = send(s, &str[i], sizeof(char), 0);
 			if(bytes == 1)
 			{
-				printf("%c\n", str[i]);
 				break;
 			}
 		}
@@ -256,7 +253,6 @@ int main(int argc, char** argv)
 								exit(1);
 							}
 
-							printf("%d\n", bytes);
 							char sentMessage[messageLength];
 							strcpy(sentMessage, message);
 

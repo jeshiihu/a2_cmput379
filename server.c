@@ -210,16 +210,19 @@ void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char*
 	{
 		int fd = users[index].fd;
 		send(fd, &flag, sizeof(flag), 0);
-		printf("sent flag\n");
+		printf("sent flag: %x\n", flag);
 
 		sendUsernameAndLength(fd, users, numberOfUsers, username, usernameLength);
-		printf("sent user update: %s to fd: %d \n",username, fd);
+		printf("sent user update: %s to fd: %d \n", username, fd);
 	}
 }
 
 void receiveString(int s, char * str, int len)
 {
 	printf("%s, %d\n", str, len);
+	if(strlen(str) == 0)
+		return;
+
 	int i;
 	for(i = 0; i < len; i++)
 	{
@@ -231,7 +234,6 @@ void receiveString(int s, char * str, int len)
 			if(bytes == 1)
 			{
 				str[i] = c;
-				printf("%c\n", c);
 				break;
 			}
 		}
@@ -239,153 +241,6 @@ void receiveString(int s, char * str, int len)
 
 	str[len] = '\0';
 }
-
-// int parentProcesses(int fdmax, fd_set read_fds, int listener, uint16_t numberOfUsers, struct username user, struct username * users, fd_set master)
-// {
-// 	int i;
-// 	for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
-// 	{
-// 		if(FD_ISSET(i, &read_fds)) // we got one!!
-// 		{
-// 			if(i == listener) // handle new connection!
-// 			{
-// 				struct sockaddr_in remoteaddr; // the remoteaddr is the client addr
-// 				socklen_t addrlen = sizeof(remoteaddr);
-
-// 				int newfd = accept(listener, (struct sockaddr*)&remoteaddr, &addrlen);
-				
-// 				if (newfd < 0) 
-// 				{
-// 					perror ("Server: accept failed");
-// 					continue;
-// 				}
-				
-// 				sendInitialHandshake(newfd);
-// 				sendNumberOfUsers(newfd, numberOfUsers);
-// 				sendAllUserNames(newfd, users, numberOfUsers);
-
-// 				int usernameLen = getUsernameLength(newfd);
-// 				char username[usernameLen + 1]; // required for adding a null terminator
-// 				receiveString(newfd, username, usernameLen);
-// 				printf("Client username: %s\n", username);
-
-// 				if(isUniqueUsername(users, numberOfUsers, username))
-// 				{
-// 					numberOfUsers = numberOfUsers + 1;
-// 					users = realloc(users, numberOfUsers * sizeof(user));
-
-// 					printf("Adding user: %s\n", username);
-// 					addUserName(users, numberOfUsers, username, usernameLen, newfd); //Calvin: changed i tp newfd
-// 					sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 1);
-
-// 					printUsers(users, numberOfUsers);
-// 					printf("\n");
-// 				}
-// 				else
-// 				{
-// 					fprintf(stderr, "\n...Username is not unique, closing connection\n");
-// 					close(newfd);
-// 					continue; // skip adding it to the master set
-// 				}
-
-// 				// successfully accepted a new selection!
-// 				FD_SET(newfd, &master); // add to the master set
-// 				if(newfd > fdmax)
-// 					fdmax = newfd; // leep track of the max
-
-// 				printf("Selected Server: new connection from %s:%d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd); // cant print off somethings...
-// 				return newfd;
-// 			}
-// 		}
-// 	}
-// }
-
-// void childProcess(int fd, struct username * users, uint16_t numberOfUsers, fd_set master, fd_set read_fds) 
-// {
-
-// 	while(1) {
-// 		struct timeval timeout;      
-// 	    timeout.tv_sec = 10;
-// 	    timeout.tv_usec = 0;
-
-// 	    if (setsockopt (fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
-// 	                sizeof(timeout)) < 0)
-// 	    {
-// 	        perror("setsockopt failed\n");
-// 	    }
-// 	    if (setsockopt (fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,
-// 	                sizeof(timeout)) < 0)
-// 	    {
-// 	        perror("setsockopt failed\n");
-// 	    }
-
-// 	    if(select(fd, &read_fds, NULL, NULL, NULL) == -1)
-// 		{
-// 			perror("Server: cannot select file descriptor");
-// 			exit(1);
-// 		}
-
-// 		int nbytes;
-// 		uint16_t messageLength;
-// 		if((nbytes = recv(fd, &messageLength, sizeof(messageLength), 0)) <= 0)
-// 		{
-// 			if(nbytes == 0) // got error or connection closed by client
-// 			{
-// 				printf("Selected Server: socket %d hung up\n", fd);
-// 			}
-// 			else
-// 			{
-// 				printf("Error: could not recv from client\n");
-// 			}
-
-// 			int index = getUserIndex(users, numberOfUsers, fd);
-
-// 			uint8_t usernameLen = users[index].length;
-// 			char username[usernameLen];
-// 			strcpy(username, users[index].name);
-
-// 			users = deleteUser(users, numberOfUsers, fd); //delete user that disconnected
-// 			numberOfUsers = numberOfUsers -1;
-// 			sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 2);
-
-// 			printf("after deleteUser\n");
-// 			printUsers(users, numberOfUsers);
-// 			close(fd);
-// 			FD_CLR(fd, &master);
-// 		}
-// 		else
-// 		{
-// 			messageLength = ntohs(messageLength);
-// 			printf("NBytes: %d, message length: %d\n" , nbytes, messageLength);
-
-// 			// get message and send to everyone...
-// 			messageLength = ntohs(messageLength);
-// 			printf("message length: %d\n", messageLength);
-
-// 			if(messageLength == 0)
-// 			{
-// 				printf("dummy\n");
-// 				//continue;
-// 			}
-
-// 			char message[messageLength + 1]; // required for adding a null terminator
-// 			receiveString(fd, message, messageLength);
-// 			printf("message recieved: %s\n", message);
-
-// 			int index;
-// 			for(index = 0; index < numberOfUsers; index++)
-// 			{
-// 				if(users[index].fd == fd) // found user!
-// 				{
-// 					break;
-// 				}
-// 			}
-
-// 			sendMessageToAllUsers(users, numberOfUsers, users[index].name, users[index].length, messageLength, message);
-// 		}
-// 	}
-
-// }
 
 int main(void)
 {
@@ -492,13 +347,8 @@ int main(void)
 				}
 				else 
 				{ // handling data from clients!!
-					printf("data from client\n");
-
 					int nbytes;
 					uint16_t messageLength;
-
-
-
 					if((nbytes = recv(i, &messageLength, sizeof(messageLength), 0)) <= 0)
 					{
 						if(nbytes == 0) // got error or connection closed by client
@@ -520,19 +370,14 @@ int main(void)
 						numberOfUsers = numberOfUsers -1;
 						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 2);
 
-						printf("after deleteUser\n");
 						printUsers(users, numberOfUsers);
 						close(i);
 						FD_CLR(i, &master);
 					}
 					else
 					{
-						printf("NBytes: %d, message length: %d\n" , nbytes, messageLength);
-
 						// get message and send to everyone...
-						messageLength = ntohs(messageLength);
-						printf("message length: %d\n", messageLength);
-
+						messageLength = ntohs(messageLength) - 1;
 						if(messageLength == 0)
 						{
 							printf("dummy\n");
@@ -541,7 +386,11 @@ int main(void)
 
 						char message[messageLength + 1]; // required for adding a null terminator
 						receiveString(i, message, messageLength);
-						printf("message recieved: %s\n", message);
+
+						if(strlen(message) == 0)
+						{
+							continue;
+						}
 
 						int index;
 						for(index = 0; index < numberOfUsers; index++)
