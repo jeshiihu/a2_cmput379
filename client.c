@@ -33,6 +33,11 @@ void getStringFromRecv(int s, char * str, int len)
 				str[i] = c;
 				break;
 			}
+			else if(bytes < 0)
+			{
+				perror("Trying to receive a string failed.");
+				exit(1);
+			}
 		}
 	}
 
@@ -49,8 +54,8 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 	int bytes;
 	if ((bytes = recv(s, &userLen, sizeof(userLen), 0)) < 0) // get the first length
 	{
-		printf("Error in reading from Server\n");
-		return;
+		perror("Error in reading from Server");
+		exit(1);
 	}
 
 	char name[userLen + 1];
@@ -68,6 +73,11 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 			{
 				break;
 			}
+			else if(bytes < 0)
+			{
+				perror("Error receiving message length from server.");
+				exit(1);
+			}
 		}
 
 		char msg[msgLength + 1];
@@ -77,29 +87,71 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 	else if(flag == join)
 	{
 		printf("User %s: joined the server!\n", name);
-		addUserName(users, numberOfUsers, name, userLen +1);
+		*numberOfUsers = *numberOfUsers + 1;
+		addUserName(users, *numberOfUsers, name, userLen);
 	}
 	else if(flag == leave)
+	{
 		printf("User %s: disconnected from server.\n", name);
+		deleteUsername(users, *numberOfUsers, name);
+		*numberOfUsers = *numberOfUsers - 1;
+	}
 }
 
-void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, int len)
+void addUserName(struct username * users, uint16_t numberOfUsers, char* name, int len)
 {
-	int index = (*numberOfUsers);
+	users[numberOfUsers - 1].length = len;
+	users[numberOfUsers - 1].name = malloc((len+1) * sizeof(char));
+	strcpy(users[numberOfUsers - 1].name, name);
+}
 
-	int newSize = ((*numberOfUsers)+1);
-	users = realloc(users, newSize * sizeof(struct username));
+void deleteUsername(struct username * users, uint16_t numberOfUsers, char* name) //deletes users in an ugly fashion of shifting other elements up and freeing space
+{
+	printf("in delete\n");
+	int index;
+	bool foundUser = false;
+	for(index = 0; index < numberOfUsers; index++)
+	{
+		if(strcmp(users[index].name, name) == 0) // found the user!
+		{
+			foundUser = true;
+			break;
+		}
+	}
 
-	users[index].length = len;
-	users[index].name = malloc((len+1) * sizeof(char));
-	strcpy(users[index].name, name);
-	*numberOfUsers = *numberOfUsers + 1;
+	if(foundUser == false)
+	{
+		printf("Could not find user %s to delete", name);
+		exit(1);
+	}
+
+	struct username user; // used to get size
+	struct username* tempUsers = malloc((numberOfUsers - 1) * sizeof(user)); //create array of size one less than it was
+
+	if(index == 0)	// want to remove the first element, so copy every thing before this element
+	{
+		memcpy(tempUsers, users+1, (numberOfUsers - 1) * sizeof(user));
+	}
+	else if(index == (numberOfUsers-1)) // want to remove the last element so copy everything until the last
+	{
+		memcpy(tempUsers, users, (numberOfUsers - 1) * sizeof(user));
+	}
+	else // want to remove an element in between, copy before and then copy after
+	{
+		memcpy(tempUsers, users, (index) * sizeof(user));
+		memcpy(tempUsers+index, users+index+1, (numberOfUsers-index-1) * sizeof(user));
+	}
+
+	users = realloc(users, (numberOfUsers-1)*sizeof(user));
+	*users = *tempUsers;
+	printCurrentUserList(users, numberOfUsers -1);
+
+	free(tempUsers);
 }
 
 void printCurrentUserList(struct username * users, int numberOfUsers)
 {
 	printf("Number of users: %d\n", numberOfUsers);
-	
 	int i;
 	for(i = 0; i < numberOfUsers; i++)
 	{
@@ -107,9 +159,11 @@ void printCurrentUserList(struct username * users, int numberOfUsers)
 	}
 }
 
-void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
+void recvAllCurrentUsers(int s, uint16_t numberOfUsers, struct username* users)
 {
 	printf("Number of current users: %d\n", numberOfUsers);
+	if(numberOfUsers > 0) // need to add this to the user list for each client
+		users = realloc(users, numberOfUsers*sizeof(struct username));
 
 	int i;
 	for(i = 0; i < numberOfUsers; i++)
@@ -127,10 +181,15 @@ void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
 				exit(1);
 			}
 		}
-		printf("len user:%d\n", len);
+
 		char name[len+1];
 		getStringFromRecv(s, name, len);
 		printf("user[%d]: %s\n", i, name);
+
+		// add to the users!
+		users[i].length = len;
+		users[i].name = malloc((len+1)*sizeof(char));
+		strcpy(users[i].name, name);
 	}
 }
 
@@ -144,16 +203,18 @@ void sendStringClient(int s, char* str, int len)
 			int bytes = send(s, &str[i], sizeof(char), 0);
 			if(bytes == 1)
 			{
+				// printf("%c\n", str[i]);
 				break;
 			}
 			if(bytes < 0)
 			{
-				perror("Error: Closing connection\n");
+				perror("Error: Trying to send string\n");
 				close(s);
 				exit(1);
 			}
 		}
 	}
+	printf("send string...\n");
 }
 
 int main(int argc, char** argv)
@@ -231,7 +292,7 @@ int main(int argc, char** argv)
 			}
 
 			numberOfUsers = ntohs(numberOfUsers);
-			recvAllCurrentUsers(s, numberOfUsers);
+			recvAllCurrentUsers(s, numberOfUsers, users);
 			
 			uint8_t len = (uint8_t)strlen(username);
 			int bytes = send(s, &len, sizeof(uint8_t), 0); // send username length
@@ -260,7 +321,19 @@ int main(int argc, char** argv)
 							if(strlen(message) == 0)
 								break;
 
+							message[strcspn(message, "\n")] = '\0';
 							messageLength = strlen(message);
+							printf("message length:%d\n", messageLength);
+							char sentMessage[messageLength];
+							strcpy(sentMessage, message);
+
+							char list[] = "-listUsers";
+							if(strcmp(sentMessage, list) == 0) // call to list current users
+							{
+								printf("\n");
+								printCurrentUserList(users, numberOfUsers);
+								continue;
+							}
 
 							uint16_t messageLengthInNBO = htons(messageLength);
 							int bytes = send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
@@ -270,9 +343,6 @@ int main(int argc, char** argv)
 								close(s);
 								exit(1);
 							}
-
-							char sentMessage[messageLength];
-							strcpy(sentMessage, message);
 
 							sendStringClient(s, sentMessage, messageLength);						
 						}

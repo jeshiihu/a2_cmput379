@@ -87,7 +87,8 @@ void sendNumberOfUsers(int listener, uint16_t numUsers)
 void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUsers)
 {
 	int i;
-	printf("nu: %d\n", numberOfUsers);
+	fprintf(fp, "Sending list of usernames: %d\n", numberOfUsers);
+
 	for(i = 0; i < numberOfUsers; i++)
 	{
 		uint8_t len;
@@ -100,22 +101,27 @@ void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUse
 				break;
 		} 
 
-		printf("%d bytes sent, len of user: %d\n", bytes, users[i].length);
+		fprintf(fp, "%d bytes sent, len of user: %d\n", bytes, users[i].length);
 
 		int expectedBytes = sizeof(users[i].name);
 		sendString(listener, users[i].name, len);
 	}
-	printf("send all users\n");
 }
 
 int getUsernameLength(int listener)
 {
-	int i;
-	int bytes = recv(listener, &i, sizeof(i), 0);
-	if(bytes == -1)
+	uint8_t i;
+
+	while(1)
 	{
-		fprintf(fp, "TIMEOUT\n");
-        fflush(fp);
+		int bytes = recv(listener, &i, sizeof(i), 0);
+		if(bytes == 1)
+			break;
+		else if(bytes < 0)
+		{
+			fprintf(fp, "Failed to get username length\n");
+			exit(1);
+		}
 	}
 
 	return i;
@@ -161,6 +167,7 @@ int getListener()
 
 void sendString(int s, char* str, int len)
 {
+	fprintf(fp, "\nSending string to socket %d... ", s);
 	int i;
 	for(i = 0; i < len; i++)
 	{
@@ -168,9 +175,19 @@ void sendString(int s, char* str, int len)
 		{
 			int bytes = send(s, &str[i], sizeof(char), 0);
 			if(bytes == 1)
+			{	
+				// fprintf(fp, "str[%d]: %c\n", i, str[i]);
 				break;
+			}
+			else if(bytes < 0)
+			{
+				fprintf(fp, "Failed to send character, bytes sent: %d\n", bytes);
+				exit(1);
+			}
 		}
 	}
+
+	fprintf(fp, "\n");
 }
 
 void sendMessageToAllUsers(struct username * users, uint16_t numberOfUsers, char* sendingUser, uint8_t sendingUserLen, int messageLength, char * message)
@@ -227,26 +244,35 @@ void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char*
 
 void receiveString(int s, char * str, int len)
 {
-	printf("%s, %d\n", str, len);
-	if(strlen(str) == 0)
+	if(len <= 0)
+	{
+		fprintf(fp, "Error: trying to receive a string of len: %d\n", len);
 		return;
+	}
 
+	fprintf(fp, "\nreceiving a string from the client socket: %d, len: %d\n", s, len);
 	int i;
 	for(i = 0; i < len; i++)
 	{
 		char c;
-		
 		while(1)
 		{
 			int bytes = recv(s, &c, sizeof(char), 0);
 			if(bytes == 1)
 			{
 				str[i] = c;
+				// fprintf(fp, "%c", c);
 				break;
+			}
+			else if(bytes <= 0)
+			{
+				fprintf(fp, "Failed to read byte character: %d bytes -> %c\n", bytes, c);
+				exit(0);
 			}
 		}
 	}
 
+	fprintf(fp, "\n");
 	str[len] = '\0';
 }
 
@@ -298,9 +324,9 @@ void startDaemon(FILE **fp)
     close(STDERR_FILENO);
 }
 
-void sigterm_handler(int signo) {
-	printf("sighandle\n");
-	fprintf(fp, "SIGTERM received. Terminating...\n");
+void sigterm_handler(int signo) 
+{
+	fprintf(fp, "\n============================\nSIGTERM received. Terminating...\n");
 	fflush(fp);
 	fclose(fp);
 	
@@ -326,7 +352,7 @@ int main(int argc, char** argv)
 	sigaction(SIGTERM, &sigterm, NULL);
 
 	startDaemon(&fp);
-	fprintf(fp, "Log file: contains erros and user updates!\n\n");
+	fprintf(fp, "Log file: contains errors and user updates!\n============================\n");
 
 	int fd;
 
@@ -460,7 +486,8 @@ int main(int argc, char** argv)
 					else
 					{
 						// get message and send to everyone...
-						messageLength = ntohs(messageLength) - 1;
+						messageLength = ntohs(messageLength) ;
+						printf("msg len: %d\n", messageLength);
 						if(messageLength == 0)
 						{
 							printf("dummy\n");
