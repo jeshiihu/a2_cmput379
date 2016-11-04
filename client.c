@@ -266,6 +266,12 @@ int main(int argc, char** argv)
 							{	
 								receiveMessage(s, messageFlag, users, &numberOfUsers);
 							}
+							else if(bytes < 0)
+							{
+								perror("Server disconnected.");
+								close(s);
+								exit(1);
+							}
 						}	
 					}
 				}
