@@ -250,11 +250,11 @@ void receiveString(int s, char * str, int len)
 	str[len] = '\0';
 }
 
-void startDaemon(FILE *fp)
+void startDaemon(FILE **fp)
 {
 	pid_t pid = 0;
     pid_t sid = 0;
-    fp= NULL;
+    *fp= NULL;
     int i = 0;
     pid = fork();
 
@@ -268,13 +268,13 @@ void startDaemon(FILE *fp)
     {
     	// in the parent
        printf("pid of child process %d \n", pid);
-       exit(0); 
+       exit(0);
     }
 
     umask(0);
 	// open a log file
-    fp = fopen ("server379procid.log", "w+");
-    if(!fp){
+    *fp = fopen("server379procid.log", "w+");
+    if(!(*fp)){
     	printf("cannot open log file");
     }
     
@@ -282,14 +282,13 @@ void startDaemon(FILE *fp)
     sid = setsid();
     if(sid < 0)
     {
-    	fprintf(fp, "cannot create new process group");
-
+    	fprintf(*fp, "cannot create new process group\n");
         exit(1);
     }
     
     /* Change the current working directory */ 
     if ((chdir("/")) < 0) {
-      printf("Could not change working directory to /\n");
+      fprintf(*fp, "Could not change working directory to /\n");
       exit(1);
     }		
 	
@@ -301,21 +300,32 @@ void startDaemon(FILE *fp)
 
 void sigterm_handler(int signo) {
 	printf("sighandle\n");
-	FILE * f = fopen ("server379procid.log", "w+");
-	fprintf(f, "SIGTERM received. Terminating...\n");
-	fclose(f);
-	exit(1);
+	fprintf(fp, "SIGTERM received. Terminating...\n");
+	fflush(fp);
+	fclose(fp);
+	
+	exit(0);
 }
 
-int main(void)
+int main(int argc, char** argv)
 {
+	if(argc != 2)
+	{
+		printf("Invalid server input, Should be formatted as: ./chat379 <portnumber>\n");
+		exit(1);
+	}
+
+	char portnumberStr[strlen(argv[2])];
+	strcpy(portnumberStr, argv[2]);
+	uint16_t port = (uint16_t)atoi(portnumberStr);
+
 	struct sigaction sigterm;
 	sigterm.sa_handler = sigterm_handler;
 	sigemptyset(&sigterm.sa_mask);
 
 	sigaction(SIGTERM, &sigterm, NULL);
 
-	startDaemon(fp);
+	startDaemon(&fp);
 	int fd;
 
 	struct username * users = malloc(1 * sizeof(struct username));
@@ -327,7 +337,7 @@ int main(void)
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_family = AF_INET;
 	sa.sin_addr.s_addr = INADDR_ANY;
-	sa.sin_port = htons(MY_PORT);
+	sa.sin_port = htons(port);
 
 	int yes = 1; // set the socket to re-use the address
 	if(setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1){

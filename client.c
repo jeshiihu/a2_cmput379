@@ -160,7 +160,7 @@ int main(int argc, char** argv)
 {	
 	if(argc != 4)
 	{
-		printf("Invalid client input. Should be formatted as: hostname portnumber username\n");
+		printf("Invalid client input. Should be formatted as: ./server379 <hostname> <portnumber> <username>\n");
 		return 0; 
 	}
 

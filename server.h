@@ -3,22 +3,18 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
 
 #include <arpa/inet.h>
-#include <signal.h>
-
-
-
-#define	MY_PORT	2222
 
 typedef int bool;
 #define true 1
 #define false 0
 
-FILE *fp= NULL;
+static FILE *fp;
 
 struct username
 {
