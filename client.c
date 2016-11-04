@@ -6,23 +6,34 @@
  --------------------------------------------------------------------- */
 char *inputMessage(FILE* fp, size_t size)
 {
+	printf("inputMessage\n");
 	char *str;
 	int ch;
 	size_t len = 0;
+
 	str = realloc(NULL, size * sizeof(*str));
+
 	if(!str) {
 		return str;
 	} 
-	while (EOF != (ch=fgetc(fp)) && ch != '\n') {
+
+	printf("stuck in inputMessage\n");
+	ch = fgetc(fp);
+	printf("got ch\n");
+	while (EOF != ch && ch != '\n') 
+	{
 		str[len++]=ch;
-		if (len==size) {
+		if (len==size) 
+		{
 			str = realloc(str, sizeof(*str)*(size+=size));
 			if (!str) {
 				return str;
 			}
 		}
 	}
+
 	str[len++] = '\0';
+	printf("leaving inputMessage\n");
 
 	return realloc(str, sizeof(*str)*len);
 }
@@ -210,6 +221,7 @@ int main(int argc, char** argv)
 	}
 
 	while (1) {
+		printf("while\n");
 		s = socket (AF_INET, SOCK_STREAM, 0);
 
 		if (s < 0) {
@@ -227,6 +239,14 @@ int main(int argc, char** argv)
 			exit (1);
 		}
 
+		fd_set master, read_fds; // master file descriptor list, and temp file descriptor list
+		FD_ZERO(&master); // clear the master and temp set
+		FD_ZERO(&read_fds);
+
+		FD_SET(0, &master); // add the listener to the master set
+		FD_SET(s, &read_fds); // add the socket to the master set
+
+		int fdmax = s; 
 		// if flag is 0 then it works exactly like read();
 		if(receivedHandshake(s))
 		{
@@ -235,26 +255,38 @@ int main(int argc, char** argv)
 			recvAllCurrentUsers(s, numberOfUsers);
 			
 			int len = (int)strlen(username);
+
 			send(s, &len, sizeof(len), 0); // send username length
 			send(s, username, sizeof(username), 0);
-			// printf("Name: %s\n", username);
 
-			pid_t forkID = fork();
 			while(1)
 			{
-				char *message;
-				uint16_t messageLength;
-				
-				if(forkID == 0) // if parent then always wait for client input message
+				read_fds = master; // copy it
+				if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
 				{
-					//pid_t pidInput = fork();
-					// if(pidInput == 0) // parent waiting to user input
-					// {
-						if(message = inputMessage(stdin, sizeof(uint16_t)))
+					perror("Server: cannot select file descriptor");
+					exit(1);
+				}
+
+				int i;
+				for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
+				{
+					if(FD_ISSET(i, &read_fds)) // we got one!!
+					{
+						printf("i: %d\n", i);
+						if(i == 0) // not our socket
 						{
+							printf("in input\n");
+							char message[256];
+							uint16_t messageLength;
+
+							// message = inputMessage(stdin, sizeof(uint16_t));
+							fgets(message, sizeof(message), stdin);
+							
+							printf("got client message\n");
 							messageLength = strlen(message);
 
-							int messageLengthInNBO = htons(messageLength);
+							uint16_t messageLengthInNBO = htons(messageLength);
 							int bytes = send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
 							if(bytes < 0)
 							{
@@ -263,6 +295,7 @@ int main(int argc, char** argv)
 								exit(1);
 							}
 
+							printf("%d\n", bytes);
 							char sentMessage[messageLength];
 							strcpy(sentMessage, message);
 
@@ -273,9 +306,61 @@ int main(int argc, char** argv)
 								close(s);
 								exit(1);
 							}
-
-							free(message);
+						
 						}
+						else
+						{
+							printf("in server\n");
+
+							uint8_t messageFlag;
+							int bytes = recv(s, &messageFlag, sizeof(messageFlag), 0);
+							if(bytes > 0) // received the flag
+							{	
+								printf("got server message\n");
+								receiveMessage(s, messageFlag, users, &numberOfUsers);
+							}
+							else
+							{
+								printf("Error: Closing connection\n");
+								close(s);
+								exit(1);
+							}
+						}	
+					}
+
+				// if(forkID == 0) // if parent then always wait for client input message
+				// {
+					//pid_t pidInput = fork();
+					// if(pidInput == 0) // parent waiting to user input
+					// {
+						// message = inputMessage(stdin, sizeof(uint16_t));
+						// if(strlen(message) > 0)
+						// {
+						// 	printf("got client message\n");
+						// 	messageLength = strlen(message);
+
+						// 	int messageLengthInNBO = htons(messageLength);
+						// 	int bytes = send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
+						// 	if(bytes < 0)
+						// 	{
+						// 		printf("Error: Closing connection\n");
+						// 		close(s);
+						// 		exit(1);
+						// 	}
+
+						// 	char sentMessage[messageLength];
+						// 	strcpy(sentMessage, message);
+
+						// 	bytes = send(s, sentMessage, sizeof(sentMessage), 0);
+						// 	if(bytes < 0)
+						// 	{
+						// 		printf("Error: Closing connection\n");
+						// 		close(s);
+						// 		exit(1);
+						// 	}
+
+						// 	free(message);
+						// }
 					//}
 					// else // sleep for 30 then send dummy
 					// {
@@ -294,21 +379,11 @@ int main(int argc, char** argv)
 					// 		printf("sending dummy\n");
 					// 	}
 					// }
-				}
-				else // child process wants to always listen to the incoming messages
-				{
-					uint8_t messageFlag;
-					int bytes = recv(s, &messageFlag, sizeof(messageFlag), 0);
-					if(bytes > 0) // received the flag
-					{	
-						receiveMessage(s, messageFlag, users, &numberOfUsers);
-					}
-					else
-					{
-						printf("Error: Closing connection\n");
-						close(s);
-						exit(1);
-					}
+				// }
+				// else // child process wants to always listen to the incoming messages
+				// {
+
+				// }
 				}
 			}
 		}
