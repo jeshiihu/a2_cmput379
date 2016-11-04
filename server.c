@@ -435,338 +435,289 @@ int main(void)
 
 
 
-	read_fds = master; // copy it
-	if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
-	{
-		perror("Server: cannot select file descriptor");
-		exit(1);
-	}
+	// read_fds = master; // copy it
+	// if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
+	// {
+	// 	perror("Server: cannot select file descriptor");
+	// 	exit(1);
+	// }
 
 	while (1) // -------------------------------------------------------- while loop --------------------------------------------------
 	{
-		printf("in while loop\n");
-
-		printf("my Pid: %d\n", Pid);
-		printf("fdmax: %d\n", fdmax);
-		if (Pid == 0) 
+		read_fds = master; // copy it
+		if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
 		{
-			printf("in child loop\n");
-
-			printf("newConnectionFd: %d\n", newConnectionFd);
-			printUsers(users, numberOfUsers);
-
-			fd_set child_read_fds;
-			FD_ZERO(&child_read_fds);
-
-			FD_SET(listener, &child_read_fds); // add the listener to the master set
-			int child_fdmax = listener; // keep track of the biggest file descriptors, for now its the listener
-
-			FD_SET(newConnectionFd, &child_read_fds);
-
-			printf("child: fd: %d\n",newConnectionFd);
-			//childProcess(fd, users, numberOfUsers, master, read_fds);
-			while(1) {
-				 //int i;
-				 // for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
-				 // {
-				 // 	if(FD_ISSET(i, &read_fds)) // we got one!!
-				 // 	{
-				 // 		newConnectionFd = i;
-				// 		if(i != listener) // handle new connection!
-				// 		{
-							// printf("in child's while loop\n");
-							struct timeval timeout;      
-						    timeout.tv_sec = 10;
-						    timeout.tv_usec = 0;
-
-						     if (setsockopt (newConnectionFd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
-						                 sizeof(timeout)) < 0)
-						     {
-						         perror("setsockopt failed\n");
-						     }
-						     if (setsockopt (newConnectionFd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,
-						                 sizeof(timeout)) < 0)
-						     {
-						         perror("setsockopt failed\n");
-						     }
-						 //    int fdsetValue;
-						 //    fdsetValue = FD_ISSET(newConnectionFd, &read_fds);
-						 //    printf("fdsetValue is: %d\n", fdsetValue );
-						 //    printf("child trying to select client\n");
-						     printf("before the select\n");
-						    if(select(child_fdmax+1, &child_read_fds, NULL, NULL, NULL) == -1)
-							{
-							 	perror("Server: cannot select file descriptor");
-							 	exit(1);
-							}
-						     printf("after the select\n");
-
-							int nbytes;
-							uint16_t messageLength;
-
-							printf("child selected client\n");
-
-							if((nbytes = recv(newConnectionFd, &messageLength, sizeof(messageLength), 0)) <= 0)
-							{
-								if(nbytes == 0) // got error or connection closed by client
-								{
-									printf("Selected Server: socket %d hung up\n", fd);
-								}
-								else
-								{
-									printf("Error: could not recv from client\n");
-								}
-								printf("child server recv something\n");
-
-								int index = getUserIndex(users, numberOfUsers, fd);
-
-								uint8_t usernameLen = users[index].length;
-								char username[usernameLen];
-								strcpy(username, users[index].name);
-
-								users = deleteUser(users, numberOfUsers, fd); //delete user that disconnected
-								numberOfUsers = numberOfUsers -1;
-								sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 2);
-
-								printf("after deleteUser\n");
-								printUsers(users, numberOfUsers);
-								close(fd);
-								FD_CLR(fd, &master);
-							}
-							else
-							{
-								printf("NBytes: %d, message length: %d\n" , nbytes, messageLength);
-
-								// get message and send to everyone...
-								messageLength = ntohs(messageLength);
-								printf("message length: %d\n", messageLength);
-
-								if(messageLength == 0)
-								{
-									printf("dummy\n");
-									//continue;
-								}
-
-								char message[messageLength + 1]; // required for adding a null terminator
-								receiveString(fd, message, messageLength);
-								printf("message recieved: %s\n", message);
-
-								// int index;
-								// for(index = 0; index < numberOfUsers; index++)
-								// {
-								// 	if(users[index].fd == fd) // found user!
-								// 	{
-								// 		break;
-								// 	}
-								// }
-
-								// sendMessageToAllUsers(users, numberOfUsers, users[index].name, users[index].length, messageLength, message);
-
-
-							}
-						}
-			// 		}
-			// 	}
-			// }
-		}
-		else
-		{
-			printf("in parent loop\n");
-			//if((newConnectionFd = parentProcesses(fdmax, read_fds, listener, numberOfUsers, user, users, master)))
-
-			int i;
-			for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
-			{
-				printf("still in for loop\n");
-				if(FD_ISSET(i, &read_fds)) // we got one!!
-				{
-					if(i == listener) // handle new connection!
-					{
-						struct sockaddr_in remoteaddr; // the remoteaddr is the client addr
-						socklen_t addrlen = sizeof(remoteaddr);
-
-						int newfd = accept(listener, (struct sockaddr*)&remoteaddr, &addrlen);
-						
-						if (newfd < 0) 
-						{
-							perror ("Server: accept failed");
-							continue;
-						}
-						
-						sendInitialHandshake(newfd);
-						sendNumberOfUsers(newfd, numberOfUsers);
-						sendAllUserNames(newfd, users, numberOfUsers);
-
-						int usernameLen = getUsernameLength(newfd);
-						char username[usernameLen + 1]; // required for adding a null terminator
-						recv(newfd, &username, usernameLen, 0);
-						username[usernameLen] = '\0';
-						printf("Client username: %s\n", username);
-
-						if(isUniqueUsername(users, numberOfUsers, username))
-						{
-							numberOfUsers = numberOfUsers + 1;
-							users = realloc(users, numberOfUsers * sizeof(user));
-
-							printf("Adding user: %s\n", username);
-							addUserName(users, numberOfUsers, username, usernameLen, newfd); //Calvin: changed i tp newfd
-							sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 1);
-
-							printUsers(users, numberOfUsers);
-							printf("\n");
-						}
-						else
-						{
-							fprintf(stderr, "\n...Username is not unique, closing connection\n");
-							close(newfd);
-							continue; // skip adding it to the master set
-						}
-
-						// successfully accepted a new selection!
-						FD_SET(newfd, &master); // add to the master set
-						if(newfd > fdmax)
-							fdmax = newfd; // leep track of the max
-
-						printf("Selected Server: new connection from %s:%d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd); // cant print off somethings...
-						newConnectionFd = newfd;
-
-						printf("found a new connection on %d\n", newConnectionFd);
-						Pid = fork();
-						if (Pid == 0) 
-						{
-							break;
-						}
-						printf("%d\n", Pid );
-						printf("after fork\n");
-						
-						printf("after parent loop\n");
-						break;
-					}
-				}
-			}
-
+			perror("Server: cannot select file descriptor");
+			exit(1);
 		}
 
+		int i;
 		// for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
 		// {
 		// 	if(FD_ISSET(i, &read_fds)) // we got one!!
-		// 	{
-		// 		if(i == listener) // handle new connection!
+		//  	{
+		// 		if(i != listener) // handle new connection!
 		// 		{
-		// 			struct sockaddr_in remoteaddr; // the remoteaddr is the client addr
-		// 			socklen_t addrlen = sizeof(remoteaddr);
+		// 			struct timeval timeout;      
+		// 		    timeout.tv_sec = 10;
+		// 		    timeout.tv_usec = 0;
 
-		// 			int newfd = accept(listener, (struct sockaddr*)&remoteaddr, &addrlen);
-					
-		// 			if (newfd < 0) 
-		// 			{
-		// 				perror ("Server: accept failed");
-		// 				continue;
-		// 			}
-					
-		// 			sendInitialHandshake(newfd);
-		// 			sendNumberOfUsers(newfd, numberOfUsers);
-		// 			sendAllUserNames(newfd, users, numberOfUsers);
-
-		// 			int usernameLen = getUsernameLength(newfd);
-		// 			char username[usernameLen + 1]; // required for adding a null terminator
-		// 			recv(newfd, &username, usernameLen, 0);
-		// 			username[usernameLen] = '\0';
-		// 			printf("Client username: %s\n", username);
-
-		// 			if(isUniqueUsername(users, numberOfUsers, username))
-		// 			{
-		// 				numberOfUsers = numberOfUsers + 1;
-		// 				users = realloc(users, numberOfUsers * sizeof(user));
-
-		// 				printf("Adding user: %s\n", username);
-		// 				addUserName(users, numberOfUsers, username, usernameLen, newfd); //Calvin: changed i tp newfd
-		// 				sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 1);
-
-		// 				printUsers(users, numberOfUsers);
-		// 				printf("\n");
-		// 			}
-		// 			else
-		// 			{
-		// 				fprintf(stderr, "\n...Username is not unique, closing connection\n");
-		// 				close(newfd);
-		// 				continue; // skip adding it to the master set
-		// 			}
-
-		// 			// successfully accepted a new selection!
-		// 			FD_SET(newfd, &master); // add to the master set
-		// 			if(newfd > fdmax)
-		// 				fdmax = newfd; // leep track of the max
-
-		// 			printf("Selected Server: new connection from %s:%d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd); // cant print off somethings...
-		// 		}
-		// 		else 
-		// 		{ // handling data from clients!!
-		// 			printf("data from client\n");
+		// 		     if (setsockopt (newConnectionFd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+		// 		         perror("setsockopt failed\n");
+		// 		     if (setsockopt (newConnectionFd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+		// 		         perror("setsockopt failed\n");
 
 		// 			int nbytes;
 		// 			uint16_t messageLength;
 
-
-
-		// 			if((nbytes = recv(i, &messageLength, sizeof(messageLength), 0)) <= 0)
+		// 			if((nbytes = recv(newConnectionFd, &messageLength, sizeof(messageLength), 0)) <= 0)
 		// 			{
 		// 				if(nbytes == 0) // got error or connection closed by client
-		// 				{
-		// 					printf("Selected Server: socket %d hung up\n", i);
-		// 				}
+		// 					printf("Selected Server: socket %d hung up\n", fd);
 		// 				else
-		// 				{
 		// 					printf("Error: could not recv from client\n");
-		// 				}
 
-		// 				int index = getUserIndex(users, numberOfUsers, i);
+		// 				int index = getUserIndex(users, numberOfUsers, fd);
 
 		// 				uint8_t usernameLen = users[index].length;
 		// 				char username[usernameLen];
 		// 				strcpy(username, users[index].name);
 
-		// 				users = deleteUser(users, numberOfUsers, i); //delete user that disconnected
+		// 				users = deleteUser(users, numberOfUsers, fd); //delete user that disconnected
 		// 				numberOfUsers = numberOfUsers -1;
 		// 				sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 2);
 
 		// 				printf("after deleteUser\n");
 		// 				printUsers(users, numberOfUsers);
-		// 				close(i);
-		// 				FD_CLR(i, &master);
+		// 				close(fd);
+		// 				FD_CLR(fd, &master);
 		// 			}
 		// 			else
 		// 			{
 		// 				printf("NBytes: %d, message length: %d\n" , nbytes, messageLength);
 
-		// 				// get message and send to everyone...
 		// 				messageLength = ntohs(messageLength);
 		// 				printf("message length: %d\n", messageLength);
 
 		// 				if(messageLength == 0)
 		// 				{
 		// 					printf("dummy\n");
-		// 					continue;
 		// 				}
 
 		// 				char message[messageLength + 1]; // required for adding a null terminator
-		// 				receiveString(i, message, messageLength);
+		// 				receiveString(fd, message, messageLength);
 		// 				printf("message recieved: %s\n", message);
 
 		// 				int index;
 		// 				for(index = 0; index < numberOfUsers; index++)
 		// 				{
-		// 					if(users[index].fd == i) // found user!
+		// 					if(users[index].fd == fd) // found user!
 		// 					{
 		// 						break;
 		// 					}
 		// 				}
 
 		// 				sendMessageToAllUsers(users, numberOfUsers, users[index].name, users[index].length, messageLength, message);
+		// 			}	
+		// 		}
+		// 	}
+		// 	else
+		// 	{
+		// 		printf("in parent loop\n");
+
+		// 		int i;
+		// 		for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
+		// 		{
+		// 			printf("still in for loop\n");
+		// 			if(FD_ISSET(i, &read_fds)) // we got one!!
+		// 			{
+		// 				if(i == listener) // handle new connection!
+		// 				{
+		// 					struct sockaddr_in remoteaddr; // the remoteaddr is the client addr
+		// 					socklen_t addrlen = sizeof(remoteaddr);
+
+		// 					int newfd = accept(listener, (struct sockaddr*)&remoteaddr, &addrlen);
+							
+		// 					if (newfd < 0) 
+		// 					{
+		// 						perror ("Server: accept failed");
+		// 						continue;
+		// 					}
+							
+		// 					sendInitialHandshake(newfd);
+		// 					sendNumberOfUsers(newfd, numberOfUsers);
+		// 					sendAllUserNames(newfd, users, numberOfUsers);
+
+		// 					int usernameLen = getUsernameLength(newfd);
+		// 					char username[usernameLen + 1]; // required for adding a null terminator
+		// 					recv(newfd, &username, usernameLen, 0);
+		// 					username[usernameLen] = '\0';
+		// 					printf("Client username: %s\n", username);
+
+		// 					if(isUniqueUsername(users, numberOfUsers, username))
+		// 					{
+		// 						numberOfUsers = numberOfUsers + 1;
+		// 						users = realloc(users, numberOfUsers * sizeof(user));
+
+		// 						printf("Adding user: %s\n", username);
+		// 						addUserName(users, numberOfUsers, username, usernameLen, newfd); //Calvin: changed i tp newfd
+		// 						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 1);
+
+		// 						printUsers(users, numberOfUsers);
+		// 						printf("\n");
+		// 					}
+		// 					else
+		// 					{
+		// 						fprintf(stderr, "\n...Username is not unique, closing connection\n");
+		// 						close(newfd);
+		// 						continue; // skip adding it to the master set
+		// 					}
+
+		// 					// successfully accepted a new selection!
+		// 					FD_SET(newfd, &master); // add to the master set
+		// 					if(newfd > fdmax)
+		// 						fdmax = newfd; // leep track of the max
+
+		// 					printf("Selected Server: new connection from %s:%d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd); // cant print off somethings...
+		// 					newConnectionFd = newfd;
+
+		// 					printf("found a new connection on %d\n", newConnectionFd);
+		// 					Pid = fork();
+		// 					if (Pid == 0) 
+		// 					{
+		// 						break;
+		// 					}
+		// 					printf("%d\n", Pid );
+		// 					printf("after fork\n");
+							
+		// 					printf("after parent loop\n");
+		// 					break;
+		// 				}
 		// 			}
-		// 		} // ending if/else to handle data from the client
-		// 	} // ending if got a new incoming connection
-		// } // ending for loop, going through all file descriptors
+		// 		}
+
+		
+
+		for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
+		{
+			if(FD_ISSET(i, &read_fds)) // we got one!!
+			{
+				if(i == listener) // handle new connection!
+				{
+					struct sockaddr_in remoteaddr; // the remoteaddr is the client addr
+					socklen_t addrlen = sizeof(remoteaddr);
+
+					int newfd = accept(listener, (struct sockaddr*)&remoteaddr, &addrlen);
+					
+					if (newfd < 0) 
+					{
+						perror ("Server: accept failed");
+						continue;
+					}
+					
+					sendInitialHandshake(newfd);
+					sendNumberOfUsers(newfd, numberOfUsers);
+					sendAllUserNames(newfd, users, numberOfUsers);
+
+					int usernameLen = getUsernameLength(newfd);
+					char username[usernameLen + 1]; // required for adding a null terminator
+					recv(newfd, &username, usernameLen, 0);
+					username[usernameLen] = '\0';
+					printf("Client username: %s\n", username);
+
+					if(isUniqueUsername(users, numberOfUsers, username))
+					{
+						numberOfUsers = numberOfUsers + 1;
+						users = realloc(users, numberOfUsers * sizeof(user));
+
+						printf("Adding user: %s\n", username);
+						addUserName(users, numberOfUsers, username, usernameLen, newfd); //Calvin: changed i tp newfd
+						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 1);
+
+						printUsers(users, numberOfUsers);
+						printf("\n");
+					}
+					else
+					{
+						fprintf(stderr, "\n...Username is not unique, closing connection\n");
+						close(newfd);
+						continue; // skip adding it to the master set
+					}
+
+					// successfully accepted a new selection!
+					FD_SET(newfd, &master); // add to the master set
+					if(newfd > fdmax)
+						fdmax = newfd; // leep track of the max
+
+					printf("Selected Server: new connection from %s:%d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd); // cant print off somethings...
+				}
+				else 
+				{ // handling data from clients!!
+					printf("data from client\n");
+
+					int nbytes;
+					uint16_t messageLength;
+
+
+
+					if((nbytes = recv(i, &messageLength, sizeof(messageLength), 0)) <= 0)
+					{
+						if(nbytes == 0) // got error or connection closed by client
+						{
+							printf("Selected Server: socket %d hung up\n", i);
+						}
+						else
+						{
+							printf("Error: could not recv from client\n");
+						}
+
+						int index = getUserIndex(users, numberOfUsers, i);
+
+						uint8_t usernameLen = users[index].length;
+						char username[usernameLen];
+						strcpy(username, users[index].name);
+
+						users = deleteUser(users, numberOfUsers, i); //delete user that disconnected
+						numberOfUsers = numberOfUsers -1;
+						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 2);
+
+						printf("after deleteUser\n");
+						printUsers(users, numberOfUsers);
+						close(i);
+						FD_CLR(i, &master);
+					}
+					else
+					{
+						printf("NBytes: %d, message length: %d\n" , nbytes, messageLength);
+
+						// get message and send to everyone...
+						messageLength = ntohs(messageLength);
+						printf("message length: %d\n", messageLength);
+
+						if(messageLength == 0)
+						{
+							printf("dummy\n");
+							continue;
+						}
+
+						char message[messageLength + 1]; // required for adding a null terminator
+						receiveString(i, message, messageLength);
+						printf("message recieved: %s\n", message);
+
+						int index;
+						for(index = 0; index < numberOfUsers; index++)
+						{
+							if(users[index].fd == i) // found user!
+							{
+								break;
+							}
+						}
+
+						sendMessageToAllUsers(users, numberOfUsers, users[index].name, users[index].length, messageLength, message);
+					}
+				} // ending if/else to handle data from the client
+			} // ending if got a new incoming connection
+		} // ending for loop, going through all file descriptors
 	}  // ending while loop
 
 	return 0;

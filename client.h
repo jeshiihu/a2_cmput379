@@ -27,5 +27,6 @@ void getStringFromRecv(int s, char * str, int len);
 void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numberOfUsers); // expecting length string (msglen msg is flag is 0x00)
 
 void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, int len);
-void printCurrentUserList(struct username * users, uint16_t numberOfUsers);
+void printCurrentUserList(struct username * users, int numberOfUsers);
 
+void sendStringClient(int s, char* str, int len);

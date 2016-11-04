@@ -85,43 +85,31 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 
 void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, int len)
 {
-	*numberOfUsers = *numberOfUsers + 1;
-	int index = (*numberOfUsers) - 1;
-	users = realloc(users, (*numberOfUsers) * sizeof(struct username));
+	printf("current users: %d\n", *numberOfUsers);
+	int index = (*numberOfUsers);
 
+	users = realloc(users, ((*numberOfUsers)+1) * sizeof(struct username));
+	printf("user at zero...: %s\n", users[0].name);
+	
 	users[index].length = len;
 	users[index].name = malloc(len * sizeof(char));
 	strcpy(users[index].name, name);
+	*numberOfUsers = *numberOfUsers + 1;
+
+	printf("user at zero...: %s\n", users[0].name);
+	printCurrentUserList(users, *numberOfUsers);
 }
 
-void populateUserList(int s, struct username * users, uint16_t numberOfUsers)
-{
-	printf("Number of Users:  %d\n", ntohs(numberOfUsers));
-	users = realloc(users, numberOfUsers * sizeof(struct username));
-
-	int i;
-	for(i = 0; i < numberOfUsers; i++)
-	{
-		uint8_t len;
-		int bytes;
-		while(1) 
-		{ 
-			bytes = recv(s, &len, sizeof(len), 0);
-			if(bytes == 1) 
-				break;
-		}
-
-		users[i].length = len;
-	}
-}
-
-void printCurrentUserList(struct username * users, uint16_t numberOfUsers)
+void printCurrentUserList(struct username * users, int numberOfUsers)
 {
 	printf("Number of users: %d\n", numberOfUsers);
 	
 	int i;
 	for(i = 0; i < numberOfUsers; i++)
+	{
+		// printf("inside for\n");
 		printf("users[%d] = %s\n", i, users[i].name);
+	}
 }
 
 void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
@@ -143,10 +131,21 @@ void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
 		getStringFromRecv(s, name, len);
 		printf("user[%d]: %s\n", i, name);
 	}
-
-	printf("\n");
 }
 
+void sendStringClient(int s, char* str, int len)
+{
+	int i;
+	for(i = 0; i < len; i++)
+	{
+		while(1)
+		{
+			int bytes = send(s, &str[i], sizeof(str[i]), 0);
+			if(bytes == 1)
+				break;
+		}
+	}
+}
 
 int main(int argc, char** argv)
 {	
@@ -157,7 +156,8 @@ int main(int argc, char** argv)
 	}
 
 	struct username user;
-	struct username * users = malloc(1 * sizeof(user));
+	struct username * users;
+	users = malloc(1 * sizeof(user));
 	uint16_t numberOfUsers = 0;
 
 	// get the client inputs!
@@ -184,7 +184,7 @@ int main(int argc, char** argv)
 	}
 
 	while (1) {
-		printf("while\n");
+		// printf("while\n");
 		s = socket (AF_INET, SOCK_STREAM, 0);
 
 		if (s < 0) {
@@ -230,26 +230,21 @@ int main(int argc, char** argv)
 					perror("Server: cannot select file descriptor");
 					exit(1);
 				}
-				printf("here\n");
 
 				int i;
 				for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
 				{
 					if(FD_ISSET(i, &read_fds)) // we got one!!
 					{
-						printf("i: %d\n", i);
 						if(i == 0) // not our socket
 						{
-							printf("in input\n");
 							char message[256];
 							uint16_t messageLength;
 
 							fgets(message, sizeof(message), stdin);
-							printf("message length: %d\n", (int)strlen(message));
 							if(strlen(message) == 0)
 								break;
 
-							printf("got client message\n");
 							messageLength = strlen(message);
 
 							uint16_t messageLengthInNBO = htons(messageLength);
@@ -265,24 +260,17 @@ int main(int argc, char** argv)
 							char sentMessage[messageLength];
 							strcpy(sentMessage, message);
 
-							bytes = send(s, sentMessage, sizeof(sentMessage), 0);
-							if(bytes < 0)
-							{
-								printf("Error: Closing connection\n");
-								close(s);
-								exit(1);
-							}
-						
+							sendStringClient(s, sentMessage, messageLength);						
 						}
 						else
 						{
-							printf("in server\n");
+							// printf("in server\n");
 
 							uint8_t messageFlag;
 							int bytes = recv(s, &messageFlag, sizeof(messageFlag), 0);
 							if(bytes > 0) // received the flag
 							{	
-								printf("got server message\n");
+								// printf("got server message\n");
 								receiveMessage(s, messageFlag, users, &numberOfUsers);
 							}
 							else
