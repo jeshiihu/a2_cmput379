@@ -220,6 +220,7 @@ int main(int argc, char** argv)
 		exit (1);
 	}
 
+
 	while (1) {
 		printf("while\n");
 		s = socket (AF_INET, SOCK_STREAM, 0);
@@ -244,7 +245,7 @@ int main(int argc, char** argv)
 		FD_ZERO(&read_fds);
 
 		FD_SET(0, &master); // add the listener to the master set
-		FD_SET(s, &read_fds); // add the socket to the master set
+		FD_SET(s, &master); // add the socket to the master set
 
 		int fdmax = s; 
 		// if flag is 0 then it works exactly like read();
@@ -267,6 +268,7 @@ int main(int argc, char** argv)
 					perror("Server: cannot select file descriptor");
 					exit(1);
 				}
+				printf("here\n");
 
 				int i;
 				for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
@@ -282,7 +284,10 @@ int main(int argc, char** argv)
 
 							// message = inputMessage(stdin, sizeof(uint16_t));
 							fgets(message, sizeof(message), stdin);
-							
+							printf("message length: %d\n", (int)strlen(message));
+							if(strlen(message) == 0)
+								break;
+
 							printf("got client message\n");
 							messageLength = strlen(message);
 
