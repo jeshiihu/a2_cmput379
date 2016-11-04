@@ -311,12 +311,12 @@ void childProcess(int fd, struct username * users, uint16_t numberOfUsers, fd_se
 	    if (setsockopt (fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
 	                sizeof(timeout)) < 0)
 	    {
-	        error("setsockopt failed\n");
+	        perror("setsockopt failed\n");
 	    }
 	    if (setsockopt (fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,
 	                sizeof(timeout)) < 0)
 	    {
-	        error("setsockopt failed\n");
+	        perror("setsockopt failed\n");
 	    }
 
 	    if(select(fd, &read_fds, NULL, NULL, NULL) == -1)
@@ -482,12 +482,12 @@ int main(void)
 						     if (setsockopt (newConnectionFd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
 						                 sizeof(timeout)) < 0)
 						     {
-						         error("setsockopt failed\n");
+						         perror("setsockopt failed\n");
 						     }
 						     if (setsockopt (newConnectionFd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,
 						                 sizeof(timeout)) < 0)
 						     {
-						         error("setsockopt failed\n");
+						         perror("setsockopt failed\n");
 						     }
 						 //    int fdsetValue;
 						 //    fdsetValue = FD_ISSET(newConnectionFd, &read_fds);
