@@ -85,7 +85,6 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 
 void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, int len)
 {
-	printf("current users: %d\n", *numberOfUsers);
 	int index = (*numberOfUsers);
 
 	int newSize = ((*numberOfUsers)+1);
@@ -121,6 +120,12 @@ void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
 			int bytes = recv(s, &len, sizeof(len), 0);
 			if(bytes == 1 && len > 0)
 				break;
+			if(bytes < 0)
+			{
+				perror("Error: Closing connection\n");
+				close(s);
+				exit(1);
+			}
 		}
 		printf("len user:%d\n", len);
 		char name[len+1];
@@ -140,6 +145,12 @@ void sendStringClient(int s, char* str, int len)
 			if(bytes == 1)
 			{
 				break;
+			}
+			if(bytes < 0)
+			{
+				perror("Error: Closing connection\n");
+				close(s);
+				exit(1);
 			}
 		}
 	}
@@ -211,7 +222,14 @@ int main(int argc, char** argv)
 		// if flag is 0 then it works exactly like read();
 		if(receivedHandshake(s))
 		{
-			recv(s, &numberOfUsers, sizeof(numberOfUsers), 0);
+			int byte = recv(s, &numberOfUsers, sizeof(numberOfUsers), 0);
+			if(byte < 0)
+			{
+				perror("Error: Closing connection\n");
+				close(s);
+				exit(1);
+			}
+
 			numberOfUsers = ntohs(numberOfUsers);
 			recvAllCurrentUsers(s, numberOfUsers);
 			
@@ -248,7 +266,7 @@ int main(int argc, char** argv)
 							int bytes = send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
 							if(bytes < 0)
 							{
-								printf("Error: Closing connection\n");
+								perror("Error: Closing connection\n");
 								close(s);
 								exit(1);
 							}

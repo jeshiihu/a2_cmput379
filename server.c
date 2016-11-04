@@ -113,7 +113,10 @@ int getUsernameLength(int listener)
 	int i;
 	int bytes = recv(listener, &i, sizeof(i), 0);
 	if(bytes == -1)
-		printf("TIMEOUT\n");
+	{
+		fprintf(fp, "TIMEOUT\n");
+        fflush(fp);
+	}
 
 	return i;
 }
@@ -123,7 +126,10 @@ uint16_t getMessageLength(int listener)
 	uint16_t i;
 	int bytes = recv(listener, &i, sizeof(i), 0);
 	if(bytes == -1)
-		printf("TIMEOUT\n");
+	{
+		fprintf(fp, "TIMEOUT\n");
+        fflush(fp);
+	}
 
 	return i;
 }
@@ -144,7 +150,9 @@ int getListener()
 {
 	int listener = socket(AF_INET, SOCK_STREAM, 0);
 	if (listener < 0) {
-		perror ("Server: cannot open master socket");
+		fprintf(fp, "Server: cannot open master socket");
+        fflush(fp);
+
 		exit (1);
 	}
 
@@ -242,13 +250,75 @@ void receiveString(int s, char * str, int len)
 	str[len] = '\0';
 }
 
+void startDaemon(FILE *fp)
+{
+	pid_t pid = 0;
+    pid_t sid = 0;
+    fp= NULL;
+    int i = 0;
+    pid = fork();
+
+    if (pid < 0)
+    {
+        printf("fork failed!\n");
+        exit(1);
+    }
+
+    if (pid > 0)
+    {
+    	// in the parent
+       printf("pid of child process %d \n", pid);
+       exit(0); 
+    }
+
+    umask(0);
+	// open a log file
+    fp = fopen ("server379procid.log", "w+");
+    if(!fp){
+    	printf("cannot open log file");
+    }
+    
+    // create new process group -- don't want to look like an orphan
+    sid = setsid();
+    if(sid < 0)
+    {
+    	fprintf(fp, "cannot create new process group");
+
+        exit(1);
+    }
+    
+    /* Change the current working directory */ 
+    if ((chdir("/")) < 0) {
+      printf("Could not change working directory to /\n");
+      exit(1);
+    }		
+	
+	// close standard fds
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+}
+
+void sigterm_handler(int signo) {
+	printf("sighandle\n");
+	FILE * f = fopen ("server379procid.log", "w+");
+	fprintf(f, "SIGTERM received. Terminating...\n");
+	fclose(f);
+	exit(1);
+}
+
 int main(void)
 {
+	struct sigaction sigterm;
+	sigterm.sa_handler = sigterm_handler;
+	sigemptyset(&sigterm.sa_mask);
 
+	sigaction(SIGTERM, &sigterm, NULL);
+
+	startDaemon(fp);
 	int fd;
 
-	struct username user; // used to get size
-	struct username * users = malloc(1 * sizeof(user));
+	struct username * users = malloc(1 * sizeof(struct username));
 	uint16_t numberOfUsers = 0;
 
 	int listener = getListener();
@@ -261,18 +331,18 @@ int main(void)
 
 	int yes = 1; // set the socket to re-use the address
 	if(setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1){
-		perror("Server: cannot set socket option");
+		fprintf(fp, "Server: cannot set socket option\n");
 		exit(1);
 	}
 
 	if (bind(listener, (struct sockaddr*) &sa, sizeof(sa)) < 0) {
-		perror ("Server: cannot bind master socket");
+		fprintf(fp, "Server: cannot bind master socket\n");
 		exit(1);
 	}
 
 	if(listen (listener, 10) == -1)
 	{
-		perror("Server: cannot listen");
+		fprintf(fp, "Server: cannot listen\n");
 		exit(1);
 	}
 
@@ -322,7 +392,7 @@ int main(void)
 					if(isUniqueUsername(users, numberOfUsers, username))
 					{
 						numberOfUsers = numberOfUsers + 1;
-						users = realloc(users, numberOfUsers * sizeof(user));
+						users = realloc(users, numberOfUsers * sizeof(struct username));
 
 						printf("Adding user: %s\n", username);
 						addUserName(users, numberOfUsers, username, usernameLen, newfd); //Calvin: changed i tp newfd
@@ -357,6 +427,8 @@ int main(void)
 						}
 						else
 						{
+							fprintf(fp, "%d", i);
+        					fflush(fp);
 							printf("Error: could not recv from client\n");
 						}
 
