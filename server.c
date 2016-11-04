@@ -431,6 +431,9 @@ int main(void)
 	int fdmax = listener; // keep track of the biggest file descriptors, for now its the listener
 
 	int Pid = 1;
+	int newConnectionFd;
+
+
 
 	read_fds = master; // copy it
 	if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
@@ -443,22 +446,32 @@ int main(void)
 	{
 		printf("in while loop\n");
 
-
 		printf("my Pid: %d\n", Pid);
-		int newConnectionFd;
+		printf("fdmax: %d\n", fdmax);
 		if (Pid == 0) 
 		{
 			printf("in child loop\n");
+
+			printf("newConnectionFd: %d\n", newConnectionFd);
 			printUsers(users, numberOfUsers);
+
+			fd_set child_read_fds;
+			FD_ZERO(&child_read_fds);
+
+			FD_SET(listener, &child_read_fds); // add the listener to the master set
+			int child_fdmax = listener; // keep track of the biggest file descriptors, for now its the listener
+
+			FD_SET(newConnectionFd, &child_read_fds);
+
 			printf("child: fd: %d\n",newConnectionFd);
 			//childProcess(fd, users, numberOfUsers, master, read_fds);
 			while(1) {
-				 int i;
-				 for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
-				 {
-				 	if(FD_ISSET(i, &read_fds)) // we got one!!
-				 	{
-				 		newConnectionFd = i;
+				 //int i;
+				 // for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
+				 // {
+				 // 	if(FD_ISSET(i, &read_fds)) // we got one!!
+				 // 	{
+				 // 		newConnectionFd = i;
 				// 		if(i != listener) // handle new connection!
 				// 		{
 							// printf("in child's while loop\n");
@@ -480,11 +493,13 @@ int main(void)
 						 //    fdsetValue = FD_ISSET(newConnectionFd, &read_fds);
 						 //    printf("fdsetValue is: %d\n", fdsetValue );
 						 //    printf("child trying to select client\n");
-						 //    if(select(newConnectionFd, &read_fds, NULL, NULL, NULL) == -1)
-							// {
-							// 	perror("Server: cannot select file descriptor");
-							// 	exit(1);
-							// }
+						     printf("before the select\n");
+						    if(select(child_fdmax+1, &child_read_fds, NULL, NULL, NULL) == -1)
+							{
+							 	perror("Server: cannot select file descriptor");
+							 	exit(1);
+							}
+						     printf("after the select\n");
 
 							int nbytes;
 							uint16_t messageLength;
@@ -551,8 +566,8 @@ int main(void)
 							}
 						}
 			// 		}
-			 	}
-			 }
+			// 	}
+			// }
 		}
 		else
 		{
@@ -562,6 +577,7 @@ int main(void)
 			int i;
 			for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
 			{
+				printf("still in for loop\n");
 				if(FD_ISSET(i, &read_fds)) // we got one!!
 				{
 					if(i == listener) // handle new connection!
@@ -613,22 +629,22 @@ int main(void)
 
 						printf("Selected Server: new connection from %s:%d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd); // cant print off somethings...
 						newConnectionFd = newfd;
+
+						printf("found a new connection on %d\n", newConnectionFd);
+						Pid = fork();
+						if (Pid == 0) 
+						{
+							break;
+						}
+						printf("%d\n", Pid );
+						printf("after fork\n");
+						
+						printf("after parent loop\n");
+						break;
 					}
 				}
 			}
 
-			{
-				printf("found a new connection\n");
-				fd = newConnectionFd;
-				Pid = fork();
-				if (Pid == 0) 
-				{
-					continue;
-				}
-				printf("%d\n", Pid );
-				printf("after fork\n");
-			}
-			printf("after parent loop\n");
 		}
 
 		// for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
