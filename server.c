@@ -431,7 +431,7 @@ int main(void)
 	FD_SET(listener, &master); // add the listener to the master set
 	int fdmax = listener; // keep track of the biggest file descriptors, for now its the listener
 
-	int Pid;
+	int Pid = 1;
 
 	read_fds = master; // copy it
 	if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
