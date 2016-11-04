@@ -26,11 +26,11 @@ bool receivedHandshake(int s);
 void getStringFromRecv(int s, char * str, int len);
 void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numberOfUsers); // expecting length string (msglen msg is flag is 0x00)
 
-void addUserName(struct username * users, uint16_t numberOfUsers, char* name, int len);
-void deleteUsername(struct username * users, uint16_t numberOfUsers, char* name);
+void addUserName(struct username ** users, uint16_t numberOfUsers, char* name, int len);
+void deleteUsername(struct username ** users, uint16_t numberOfUsers, char* name);
 
 void printCurrentUserList(struct username * users, int numberOfUsers);
 
 void sendStringClient(int s, char* str, int len);
 
-void recvAllCurrentUsers(int s, uint16_t numberOfUsers, struct username* users);
+void recvAllCurrentUsers(int s, uint16_t numberOfUsers, struct username** users);
