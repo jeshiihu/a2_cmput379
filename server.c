@@ -315,8 +315,8 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 
-	char portnumberStr[strlen(argv[2])];
-	strcpy(portnumberStr, argv[2]);
+	char portnumberStr[strlen(argv[1])];
+	strcpy(portnumberStr, argv[1]);
 	uint16_t port = (uint16_t)atoi(portnumberStr);
 
 	struct sigaction sigterm;
@@ -326,6 +326,8 @@ int main(int argc, char** argv)
 	sigaction(SIGTERM, &sigterm, NULL);
 
 	startDaemon(&fp);
+	fprintf(fp, "Log file: contains erros and user updates!\n\n");
+
 	int fd;
 
 	struct username * users = malloc(1 * sizeof(struct username));
@@ -368,7 +370,7 @@ int main(int argc, char** argv)
 		read_fds = master; // copy it
 		if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1)
 		{
-			perror("Server: cannot select file descriptor");
+			fprintf(fp, "Server: cannot select file descriptor\n");
 			exit(1);
 		}
 
@@ -386,7 +388,7 @@ int main(int argc, char** argv)
 					
 					if (newfd < 0) 
 					{
-						perror ("Server: accept failed");
+						fprintf(fp, "Server: accept failed\n");
 						continue;
 					}
 					
@@ -397,14 +399,14 @@ int main(int argc, char** argv)
 					uint8_t usernameLen = getUsernameLength(newfd);
 					char username[usernameLen + 1]; // required for adding a null terminator
 					receiveString(newfd, username, usernameLen);
-					printf("Client username: %s\n", username);
+					fprintf(fp, "User joined, client username: %s\n", username);
 
 					if(isUniqueUsername(users, numberOfUsers, username))
 					{
 						numberOfUsers = numberOfUsers + 1;
 						users = realloc(users, numberOfUsers * sizeof(struct username));
 
-						printf("Adding user: %s\n", username);
+						fprintf(fp, "Username '%s' is unique, successfully added!\n", username);
 						addUserName(users, numberOfUsers, username, usernameLen, newfd); //Calvin: changed i tp newfd
 						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 1);
 
@@ -413,7 +415,7 @@ int main(int argc, char** argv)
 					}
 					else
 					{
-						fprintf(stderr, "\n...Username is not unique, closing connection\n");
+						fprintf(fp, "\n...Username '%s' is not unique, closing connection\n", username);
 						close(newfd);
 						continue; // skip adding it to the master set
 					}
@@ -433,13 +435,11 @@ int main(int argc, char** argv)
 					{
 						if(nbytes == 0) // got error or connection closed by client
 						{
-							printf("Selected Server: socket %d hung up\n", i);
+							fprintf(fp, "Selected Server: socket %d hung up\n", i);
 						}
 						else
 						{
-							fprintf(fp, "%d", i);
-        					fflush(fp);
-							printf("Error: could not recv from client\n");
+							fprintf(fp, "Error: could not recv from client of socket %d\n", i);
 						}
 
 						int index = getUserIndex(users, numberOfUsers, i);
@@ -451,6 +451,7 @@ int main(int argc, char** argv)
 						users = deleteUser(users, numberOfUsers, i); //delete user that disconnected
 						numberOfUsers = numberOfUsers -1;
 						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 2);
+						fprintf(fp, "User %s has disconnected.\n", username);
 
 						printUsers(users, numberOfUsers);
 						close(i);
