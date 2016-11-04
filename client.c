@@ -28,7 +28,7 @@ void getStringFromRecv(int s, char * str, int len)
 		while(1)
 		{
 			int bytes = recv(s, &c, sizeof(c), 0);
-			if(bytes == 1 && (strlen(&c) != 0))
+			if(bytes == 1)
 			{
 				str[i] = c;
 				break;
@@ -124,7 +124,7 @@ void recvAllCurrentUsers(int s, uint16_t numberOfUsers)
 			if(bytes == 1 && len > 0)
 				break;
 		}
-
+		printf("len user:%d\n", len);
 		char name[len+1];
 		getStringFromRecv(s, name, len);
 		printf("user[%d]: %s\n", i, name);
@@ -138,9 +138,12 @@ void sendStringClient(int s, char* str, int len)
 	{
 		while(1)
 		{
-			int bytes = send(s, &str[i], sizeof(str[i]), 0);
+			int bytes = send(s, &str[i], sizeof(char), 0);
 			if(bytes == 1)
+			{
+				printf("%c\n", str[i]);
 				break;
+			}
 		}
 	}
 }
@@ -216,7 +219,7 @@ int main(int argc, char** argv)
 			recvAllCurrentUsers(s, numberOfUsers);
 			
 			uint8_t len = (uint8_t)strlen(username);
-			int bytes = send(s, &len, sizeof(len), 0); // send username length
+			int bytes = send(s, &len, sizeof(uint8_t), 0); // send username length
 			sendStringClient(s, username, len);
 
 			while(1)
@@ -261,26 +264,11 @@ int main(int argc, char** argv)
 						}
 						else
 						{
-							// printf("in server\n");
-
 							uint8_t messageFlag;
 							int bytes = recv(s, &messageFlag, sizeof(messageFlag), 0);
-							if(bytes > 0) // received the flag
+							if(bytes == 1) // received the flag
 							{	
-								// printf("before receive server message\n");
-								// printCurrentUserList(users, numberOfUsers);
-
 								receiveMessage(s, messageFlag, users, &numberOfUsers);
-								// printf("after receive server message\n");
-
-								// printCurrentUserList(users, numberOfUsers);
-
-							}
-							else
-							{
-								printf("Error: Closing connection\n");
-								close(s);
-								exit(1);
 							}
 						}	
 					}
