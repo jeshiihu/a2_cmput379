@@ -412,7 +412,6 @@ int main(void)
 		exit(1);
 	}
 
-
 	if (bind(listener, (struct sockaddr*) &sa, sizeof(sa)) < 0) {
 		perror ("Server: cannot bind master socket");
 		exit(1);
