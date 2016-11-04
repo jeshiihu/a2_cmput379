@@ -88,16 +88,15 @@ void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, i
 	printf("current users: %d\n", *numberOfUsers);
 	int index = (*numberOfUsers);
 
-	users = realloc(users, ((*numberOfUsers)+1) * sizeof(struct username));
-	printf("user at zero...: %s\n", users[0].name);
-	
+	int newSize = ((*numberOfUsers)+1);
+	users = realloc(users, newSize * sizeof(struct username));
+
 	users[index].length = len;
-	users[index].name = malloc(len * sizeof(char));
+	users[index].name = malloc((len+1) * sizeof(char));
 	strcpy(users[index].name, name);
 	*numberOfUsers = *numberOfUsers + 1;
 
-	printf("user at zero...: %s\n", users[0].name);
-	printCurrentUserList(users, *numberOfUsers);
+	// printCurrentUserList(users, *numberOfUsers);
 }
 
 void printCurrentUserList(struct username * users, int numberOfUsers)
@@ -107,7 +106,6 @@ void printCurrentUserList(struct username * users, int numberOfUsers)
 	int i;
 	for(i = 0; i < numberOfUsers; i++)
 	{
-		// printf("inside for\n");
 		printf("users[%d] = %s\n", i, users[i].name);
 	}
 }
@@ -217,10 +215,9 @@ int main(int argc, char** argv)
 			numberOfUsers = ntohs(numberOfUsers);
 			recvAllCurrentUsers(s, numberOfUsers);
 			
-			int len = (int)strlen(username);
-
-			send(s, &len, sizeof(len), 0); // send username length
-			send(s, username, sizeof(username), 0);
+			uint8_t len = (uint8_t)strlen(username);
+			int bytes = send(s, &len, sizeof(len), 0); // send username length
+			sendStringClient(s, username, len);
 
 			while(1)
 			{
@@ -270,8 +267,14 @@ int main(int argc, char** argv)
 							int bytes = recv(s, &messageFlag, sizeof(messageFlag), 0);
 							if(bytes > 0) // received the flag
 							{	
-								// printf("got server message\n");
+								// printf("before receive server message\n");
+								// printCurrentUserList(users, numberOfUsers);
+
 								receiveMessage(s, messageFlag, users, &numberOfUsers);
+								// printf("after receive server message\n");
+
+								// printCurrentUserList(users, numberOfUsers);
+
 							}
 							else
 							{

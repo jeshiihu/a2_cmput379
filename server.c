@@ -327,7 +327,6 @@ void childProcess(int fd, struct username * users, uint16_t numberOfUsers, fd_se
 
 		int nbytes;
 		uint16_t messageLength;
-
 		if((nbytes = recv(fd, &messageLength, sizeof(messageLength), 0)) <= 0)
 		{
 			if(nbytes == 0) // got error or connection closed by client
@@ -356,6 +355,7 @@ void childProcess(int fd, struct username * users, uint16_t numberOfUsers, fd_se
 		}
 		else
 		{
+			messageLength = ntohs(messageLength);
 			printf("NBytes: %d, message length: %d\n" , nbytes, messageLength);
 
 			// get message and send to everyone...
@@ -372,18 +372,16 @@ void childProcess(int fd, struct username * users, uint16_t numberOfUsers, fd_se
 			receiveString(fd, message, messageLength);
 			printf("message recieved: %s\n", message);
 
-			// int index;
-			// for(index = 0; index < numberOfUsers; index++)
-			// {
-			// 	if(users[index].fd == fd) // found user!
-			// 	{
-			// 		break;
-			// 	}
-			// }
+			int index;
+			for(index = 0; index < numberOfUsers; index++)
+			{
+				if(users[index].fd == fd) // found user!
+				{
+					break;
+				}
+			}
 
-			// sendMessageToAllUsers(users, numberOfUsers, users[index].name, users[index].length, messageLength, message);
-
-
+			sendMessageToAllUsers(users, numberOfUsers, users[index].name, users[index].length, messageLength, message);
 		}
 	}
 
@@ -621,8 +619,7 @@ int main(void)
 
 					int usernameLen = getUsernameLength(newfd);
 					char username[usernameLen + 1]; // required for adding a null terminator
-					recv(newfd, &username, usernameLen, 0);
-					username[usernameLen] = '\0';
+					receiveString(newfd, username, usernameLen);
 					printf("Client username: %s\n", username);
 
 					if(isUniqueUsername(users, numberOfUsers, username))
