@@ -21,12 +21,6 @@ struct username
 	char* name;
 };
 
-// struct username user;
-// struct username * users;
-// int numberOfUsers = 0;
-
-char *inputMessage(FILE* fp, size_t size);
-
 bool receivedHandshake(int s);
 
 void getStringFromRecv(int s, char * str, int len);
@@ -34,6 +28,4 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 
 void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, int len);
 void printCurrentUserList(struct username * users, uint16_t numberOfUsers);
-
-// void getCurrentUserList(int s, struct username * users, int numberOfUsers);
 

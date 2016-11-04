@@ -4,40 +4,6 @@
  This is a sample client program for the number server. The client and
  the server need not run on the same machine.				 
  --------------------------------------------------------------------- */
-char *inputMessage(FILE* fp, size_t size)
-{
-	printf("inputMessage\n");
-	char *str;
-	int ch;
-	size_t len = 0;
-
-	str = realloc(NULL, size * sizeof(*str));
-
-	if(!str) {
-		return str;
-	} 
-
-	printf("stuck in inputMessage\n");
-	ch = fgetc(fp);
-	printf("got ch\n");
-	while (EOF != ch && ch != '\n') 
-	{
-		str[len++]=ch;
-		if (len==size) 
-		{
-			str = realloc(str, sizeof(*str)*(size+=size));
-			if (!str) {
-				return str;
-			}
-		}
-	}
-
-	str[len++] = '\0';
-	printf("leaving inputMessage\n");
-
-	return realloc(str, sizeof(*str)*len);
-}
-
 bool receivedHandshake(int s)
 {
 	uint8_t * handshakeBuf = malloc(2 * sizeof(uint8_t));
@@ -88,14 +54,12 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 	}
 
 	char name[userLen + 1];
-	// bytes = recv(s, &name, sizeof(name), 0);
-	// name[userLen] = '\0';
 	getStringFromRecv(s, name, userLen);
 
 	if(flag == msg) // regular message
 	{
 		uint16_t msgLength;
-		while(1)
+		while(1) // need to recieve the message length from the server
 		{
 			bytes = recv(s, &msgLength, sizeof(msgLength), 0);
 			msgLength = ntohs(msgLength);
@@ -107,7 +71,7 @@ void receiveMessage(int s, uint8_t flag, struct username * users, uint16_t* numb
 		}
 
 		char msg[msgLength + 1];
-		getStringFromRecv(s, msg, msgLength);
+		getStringFromRecv(s, msg, msgLength); //get the message from the server
 		printf("User %s: %s\n", name, msg);
 	}
 	else if(flag == join)
@@ -129,7 +93,6 @@ void addUserName(struct username * users, uint16_t* numberOfUsers, char* name, i
 	users[index].name = malloc(len * sizeof(char));
 	strcpy(users[index].name, name);
 }
-
 
 void populateUserList(int s, struct username * users, uint16_t numberOfUsers)
 {
@@ -220,7 +183,6 @@ int main(int argc, char** argv)
 		exit (1);
 	}
 
-
 	while (1) {
 		printf("while\n");
 		s = socket (AF_INET, SOCK_STREAM, 0);
@@ -244,7 +206,7 @@ int main(int argc, char** argv)
 		FD_ZERO(&master); // clear the master and temp set
 		FD_ZERO(&read_fds);
 
-		FD_SET(0, &master); // add the listener to the master set
+		FD_SET(0, &master); 
 		FD_SET(s, &master); // add the socket to the master set
 
 		int fdmax = s; 
@@ -282,7 +244,6 @@ int main(int argc, char** argv)
 							char message[256];
 							uint16_t messageLength;
 
-							// message = inputMessage(stdin, sizeof(uint16_t));
 							fgets(message, sizeof(message), stdin);
 							printf("message length: %d\n", (int)strlen(message));
 							if(strlen(message) == 0)
@@ -332,63 +293,6 @@ int main(int argc, char** argv)
 							}
 						}	
 					}
-
-				// if(forkID == 0) // if parent then always wait for client input message
-				// {
-					//pid_t pidInput = fork();
-					// if(pidInput == 0) // parent waiting to user input
-					// {
-						// message = inputMessage(stdin, sizeof(uint16_t));
-						// if(strlen(message) > 0)
-						// {
-						// 	printf("got client message\n");
-						// 	messageLength = strlen(message);
-
-						// 	int messageLengthInNBO = htons(messageLength);
-						// 	int bytes = send(s, &messageLengthInNBO, sizeof(messageLengthInNBO),0);
-						// 	if(bytes < 0)
-						// 	{
-						// 		printf("Error: Closing connection\n");
-						// 		close(s);
-						// 		exit(1);
-						// 	}
-
-						// 	char sentMessage[messageLength];
-						// 	strcpy(sentMessage, message);
-
-						// 	bytes = send(s, sentMessage, sizeof(sentMessage), 0);
-						// 	if(bytes < 0)
-						// 	{
-						// 		printf("Error: Closing connection\n");
-						// 		close(s);
-						// 		exit(1);
-						// 	}
-
-						// 	free(message);
-						// }
-					//}
-					// else // sleep for 30 then send dummy
-					// {
-					// 	while(1)
-					// 	{
-					// 		sleep(10);
-					// 		uint16_t dummyLength = htons(0);
-					// 		int bytes = send(s, &dummyLength, sizeof(dummyLength), 0);
-							
-					// 		if(bytes < 0)
-					// 		{
-					// 			printf("Error: Closing connection\n");
-					// 			close(s);
-					// 			exit(1);
-					// 		}
-					// 		printf("sending dummy\n");
-					// 	}
-					// }
-				// }
-				// else // child process wants to always listen to the incoming messages
-				// {
-
-				// }
 				}
 			}
 		}
