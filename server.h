@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
-
+#include <string.h>
 #include <arpa/inet.h>
 
 typedef int bool;

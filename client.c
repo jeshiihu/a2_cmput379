@@ -107,7 +107,7 @@ void addUserName(struct username ** users, uint16_t numberOfUsers, char* name, i
 
 void deleteUsername(struct username ** users, uint16_t numberOfUsers, char* name) //deletes users in an ugly fashion of shifting other elements up and freeing space
 {
-	printf("in delete\n");
+	// printf("in delete\n");
 	int index;
 	bool foundUser = false;
 	for(index = 0; index < numberOfUsers; index++)
@@ -143,12 +143,8 @@ void deleteUsername(struct username ** users, uint16_t numberOfUsers, char* name
 	}
 
 	*users = realloc((*users), (numberOfUsers-1)*sizeof(user));
-	printf("TEMP\n");
-	printCurrentUserList(tempUsers, numberOfUsers -1);
-
 	*users = tempUsers;
-	printCurrentUserList(*users, numberOfUsers -1);
-
+	// printCurrentUserList(*users, numberOfUsers-1);
 	free(tempUsers);
 }
 
@@ -164,11 +160,10 @@ void printCurrentUserList(struct username * users, int numberOfUsers)
 
 void recvAllCurrentUsers(int s, uint16_t numberOfUsers, struct username ** users)
 {
-	printf("Number of current users: %d\n", numberOfUsers);
+	printf("Receiving list of current users: %d users\n", numberOfUsers);
 	if(numberOfUsers > 1) // need to add this to the user list for each client
 		*users = realloc((*users), numberOfUsers*sizeof(struct username));
 
-	printf("realloc of size %d successful\n", numberOfUsers);
 	int i;
 	for(i = 0; i < numberOfUsers; i++)
 	{
@@ -195,9 +190,6 @@ void recvAllCurrentUsers(int s, uint16_t numberOfUsers, struct username ** users
 		(*users)[i].name = malloc((len+1)*sizeof(char));
 		strcpy((*users)[i].name, name);
 	}
-
-			printf("INSIDE RECEIVE\n");
-		printCurrentUserList((*users), numberOfUsers);
 }
 
 void sendStringClient(int s, char* str, int len)
@@ -221,7 +213,6 @@ void sendStringClient(int s, char* str, int len)
 			}
 		}
 	}
-	printf("send string...\n");
 }
 
 int main(int argc, char** argv)
@@ -300,15 +291,16 @@ int main(int argc, char** argv)
 
 			numberOfUsers = ntohs(numberOfUsers);
 			recvAllCurrentUsers(s, numberOfUsers, &users);
-			
-			printf("AFTER RECEIVE ALL USERS\n");
-			printCurrentUserList(users, numberOfUsers);
-			printf("\n");
-
 
 			uint8_t len = (uint8_t)strlen(username);
 			int bytes = send(s, &len, sizeof(uint8_t), 0); // send username length
 			sendStringClient(s, username, len);
+
+			pthread_t dummy;
+			if(pthread_create(&dummy, NULL, sendDummy, &s))
+			{
+				printf("Failed to create thread\n");
+			}
 
 			while(1)
 			{
@@ -335,7 +327,6 @@ int main(int argc, char** argv)
 
 							message[strcspn(message, "\n")] = '\0';
 							messageLength = strlen(message);
-							printf("message length:%d\n", messageLength);
 							char sentMessage[messageLength];
 							strcpy(sentMessage, message);
 
@@ -382,3 +373,24 @@ int main(int argc, char** argv)
 
 	return 0;
 }
+
+
+void* sendDummy(void* param)
+{
+	while(1)
+	{
+		int* sock = (int*)param;
+		sleep(30);
+		uint16_t dummyLength = 0;
+		send(*sock, &dummyLength, sizeof(uint16_t), 0);
+		// printf("sent dummy\n");
+	}
+
+	return NULL;
+}
+
+
+
+
+
+

@@ -8,6 +8,7 @@
 #include <strings.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 
 // #define	 MY_PORT  2222
 
@@ -34,3 +35,5 @@ void printCurrentUserList(struct username * users, int numberOfUsers);
 void sendStringClient(int s, char* str, int len);
 
 void recvAllCurrentUsers(int s, uint16_t numberOfUsers, struct username** users);
+
+void* sendDummy(void* param);

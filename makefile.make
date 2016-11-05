@@ -10,7 +10,7 @@ server: server.c
 	gcc -o server379 server.c
 
 client: client.c
-	gcc -o chat379 client.c
+	gcc -o chat379 -pthread client.c
 
 clean:
 	-rm -f *.o server client

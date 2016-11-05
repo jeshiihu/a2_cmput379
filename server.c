@@ -31,7 +31,6 @@ int getUserIndex(struct username * users, uint16_t numberOfUsers, int fd)
 	int index;
  	for(index = 0; index < numberOfUsers; index++)
 	{
-	 	//printf("comparing fd to be checked %d to passed fd %d \n",users[index].fd,fd );
 	 	if(users[index].fd == fd) // found the user
 	 		break;
 	}
@@ -66,6 +65,7 @@ struct username* deleteUser(struct username * users, uint16_t numberOfUsers, int
 	return tempUsers;
 }
 
+// --------- Initial handshake ---------
 void sendInitialHandshake(int listener)
 {
 	uint8_t * handshakeArray = malloc(2 * sizeof(uint8_t));
@@ -73,40 +73,49 @@ void sendInitialHandshake(int listener)
 	handshakeArray[1] = 0xaf;
 	int bytesSentFirst;
 	bytesSentFirst = send(listener, handshakeArray, 2 * sizeof(uint8_t), 0);
+	if(bytesSentFirst <= 0)
+	{
+		fprintf(fp, "Failed to send handshake\n");
+		exit(1);
+	}
 }
 
 void sendNumberOfUsers(int listener, uint16_t numUsers)
 {
-	printf("sending number of users...\n" );
-
 	uint16_t num = htons(numUsers);
 	int bytes = send (listener, &num, sizeof(num), 0);
-	printf("%d bytes sent: number of users is %d\n", bytes, numUsers);
+	if(bytes <= 0)
+	{
+		fprintf(fp, "Failed to send number of users\n");
+		exit(1);
+	}
 }
 
 void sendAllUserNames(int listener, struct username* users, uint16_t numberOfUsers)
 {
 	int i;
-	fprintf(fp, "Sending list of usernames: %d\n", numberOfUsers);
-
 	for(i = 0; i < numberOfUsers; i++)
 	{
 		uint8_t len;
 		int bytes;
-		while(1)
+		while(1) // sent it byte by byte to ensure proper send!
 		{
 			len = users[i].length;
 			bytes = send(listener, &len, sizeof(len), 0);
 			if(bytes == 1)
 				break;
+			else if(bytes <= 0)
+			{
+				fprintf(fp, "Failed to send all user names\n");
+				exit(1);
+			}
 		} 
-
-		fprintf(fp, "%d bytes sent, len of user: %d\n", bytes, users[i].length);
 
 		int expectedBytes = sizeof(users[i].name);
 		sendString(listener, users[i].name, len);
 	}
 }
+// --------- Initial handshake ---------
 
 int getUsernameLength(int listener)
 {
@@ -117,10 +126,10 @@ int getUsernameLength(int listener)
 		int bytes = recv(listener, &i, sizeof(i), 0);
 		if(bytes == 1)
 			break;
-		else if(bytes < 0)
+		else if(bytes <= 0)
 		{
 			fprintf(fp, "Failed to get username length\n");
-			exit(1);
+       		exit(1);
 		}
 	}
 
@@ -131,10 +140,10 @@ uint16_t getMessageLength(int listener)
 {
 	uint16_t i;
 	int bytes = recv(listener, &i, sizeof(i), 0);
-	if(bytes == -1)
+	if(bytes <= 0)
 	{
-		fprintf(fp, "TIMEOUT\n");
-        fflush(fp);
+		fprintf(fp, "Failed to get message length\n");
+		exit(1);
 	}
 
 	return i;
@@ -167,7 +176,6 @@ int getListener()
 
 void sendString(int s, char* str, int len)
 {
-	fprintf(fp, "\nSending string to socket %d... ", s);
 	int i;
 	for(i = 0; i < len; i++)
 	{
@@ -176,10 +184,9 @@ void sendString(int s, char* str, int len)
 			int bytes = send(s, &str[i], sizeof(char), 0);
 			if(bytes == 1)
 			{	
-				// fprintf(fp, "str[%d]: %c\n", i, str[i]);
 				break;
 			}
-			else if(bytes < 0)
+			else if(bytes <= 0)
 			{
 				fprintf(fp, "Failed to send character, bytes sent: %d\n", bytes);
 				exit(1);
@@ -202,14 +209,23 @@ void sendMessageToAllUsers(struct username * users, uint16_t numberOfUsers, char
 
 		// send username!
 		int byte = send(fd, &sendingUserLen, sizeof(sendingUserLen), 0);
+		if(byte <= 0)
+		{
+			fprintf(fp, "Failed to send user len\n");
+			exit(1);
+		}
+
 		sendString(fd, sendingUser, sendingUserLen);
 
-		uint16_t messageLengthInNBO = htons(messageLength);
+		uint16_t messageLengthInNBO = htons(messageLength); // send the message length
 		int sendByte = send(fd, &messageLengthInNBO, sizeof(messageLengthInNBO), 0);
+		if(sendByte <= 0)
+		{
+			fprintf(fp, "Failed to send msg len\n");
+			exit(1);
+		}
 		
-		sendString(fd, message, messageLength);
-
-		printf("sent message: %s to fd: %d \n",message, fd);
+		sendString(fd, message, messageLength); // send the actual message
 	}
 }
 
@@ -217,15 +233,17 @@ void sendUsernameAndLength(int fd, struct username * users, uint16_t numberOfUse
 {
 	uint8_t usernameLengthInNBO = usernameLength;
 	int sendByte = send(fd, &usernameLengthInNBO, sizeof(usernameLengthInNBO), 0);
-	// printf("send byte: %d\n",sendByte);
+	if(sendByte <= 0)
+	{
+		fprintf(fp, "Failed to send user length\n");
+		exit(1);
+	}
 	
 	sendString(fd, username, usernameLength);
 }
 
 void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char* name, uint8_t nameLen,  uint8_t flag)
 {
-	printf("in send leave update\n");
-
 	uint8_t usernameLength = nameLen;
 	char username[usernameLength];
 	strcpy(username, name);
@@ -234,11 +252,14 @@ void sendUpdateToAllUsers(struct username * users, uint16_t numberOfUsers, char*
 	for(index = 0; index < numberOfUsers; index++) 
 	{
 		int fd = users[index].fd;
-		send(fd, &flag, sizeof(flag), 0);
-		printf("sent flag: %x\n", flag);
+		int bytes = send(fd, &flag, sizeof(flag), 0); // must send the flag to indicate if someone is joining or leaving
+		if(bytes <= 0)
+		{
+			fprintf(fp, "Failed to send handshake\n");
+			exit(1);
+		}
 
 		sendUsernameAndLength(fd, users, numberOfUsers, username, usernameLength);
-		printf("sent user update: %s to fd: %d \n", username, fd);
 	}
 }
 
@@ -250,7 +271,6 @@ void receiveString(int s, char * str, int len)
 		return;
 	}
 
-	fprintf(fp, "\nreceiving a string from the client socket: %d, len: %d\n", s, len);
 	int i;
 	for(i = 0; i < len; i++)
 	{
@@ -290,6 +310,11 @@ void startDaemon(FILE **fp)
         exit(1);
     }
 
+    if(pid == 0)
+    {
+    	sleep(1);
+    }
+
     if (pid > 0)
     {
     	// in the parent
@@ -298,8 +323,16 @@ void startDaemon(FILE **fp)
     }
 
     umask(0);
+
+    // create the proper string name for the file
+    char logfile[256] = "server379";
+    char strPid[50];
+    snprintf(strPid, 50,"%d", getpid());
+	strcat(logfile, strPid);
+	strcat(logfile, ".log");
+
 	// open a log file
-    *fp = fopen("server379procid.log", "w+");
+    *fp = fopen(logfile, "w+");
     if(!(*fp)){
     	printf("cannot open log file");
     }
@@ -403,6 +436,8 @@ int main(int argc, char** argv)
 		int i;
 		for(i = 0; i <= fdmax; i++) // this loops through the file descriptors
 		{
+
+
 			if(FD_ISSET(i, &read_fds)) // we got one!!
 			{
 				if(i == listener) // handle new connection!
@@ -418,6 +453,22 @@ int main(int argc, char** argv)
 						continue;
 					}
 					
+					struct timeval time;
+					time.tv_sec = 30;  /* 30 Secs Timeout */
+					time.tv_usec = 0;  // Not init'ing this can cause strange errors
+
+					if(setsockopt(newfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&time, sizeof(struct timeval)) == -1)
+					{
+						fprintf(fp, "Server: cannot set socket option\n");
+						exit(1);
+					}
+
+					if(setsockopt(newfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&time, sizeof(struct timeval)) == -1)
+					{
+						fprintf(fp, "Server: cannot set socket option\n");
+						exit(1);
+					}
+
 					sendInitialHandshake(newfd);
 					sendNumberOfUsers(newfd, numberOfUsers);
 					sendAllUserNames(newfd, users, numberOfUsers);
@@ -437,11 +488,10 @@ int main(int argc, char** argv)
 						sendUpdateToAllUsers(users, numberOfUsers, username, usernameLen, 1);
 
 						printUsers(users, numberOfUsers);
-						printf("\n");
 					}
 					else
 					{
-						fprintf(fp, "\n...Username '%s' is not unique, closing connection\n", username);
+						fprintf(fp, "...Username '%s' is not unique, closing connection\n", username);
 						close(newfd);
 						continue; // skip adding it to the master set
 					}
@@ -451,10 +501,11 @@ int main(int argc, char** argv)
 					if(newfd > fdmax)
 						fdmax = newfd; // leep track of the max
 
-					printf("Selected Server: new connection from %s:%d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd); // cant print off somethings...
+					fprintf(fp, "Selected Server: new connection from %s:%d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port), newfd); // cant print off somethings...
 				}
 				else 
 				{ // handling data from clients!!
+
 					int nbytes;
 					uint16_t messageLength;
 					if((nbytes = recv(i, &messageLength, sizeof(messageLength), 0)) <= 0)
@@ -487,7 +538,6 @@ int main(int argc, char** argv)
 					{
 						// get message and send to everyone...
 						messageLength = ntohs(messageLength) ;
-						printf("msg len: %d\n", messageLength);
 						if(messageLength == 0)
 						{
 							printf("dummy\n");
